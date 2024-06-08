@@ -87,37 +87,7 @@ sequenceDiagram
     Multisig-->>User: Multisig Address
 ```
 
-## Creating a Proposal
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Deployer
-    participant Multisig
-
-    User->>Deployer: initialize(multisig_wasm_hash)
-    Deployer-->>User: Confirmation
-    User->>Deployer: deploy_new_multisig(deployer, salt, name, description, members, quorum_bps)
-    Deployer-->>Multisig: Deploy and Initialize
-    Multisig-->>User: Multisig Address
-```
-
 ## Example workflow
-
-### Deploy and Initialize Multisig
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Deployer
-    participant Multisig
-
-    User->>Deployer: initialize(multisig_wasm_hash)
-    Deployer-->>User: Confirmation
-    User->>Deployer: deploy_new_multisig(deployer, salt, name, description, members, quorum_bps)
-    Deployer-->>Multisig: Deploy and Initialize
-    Multisig-->>User: Multisig Address
-```
 
 ### Create and Execute a Proposal
 
