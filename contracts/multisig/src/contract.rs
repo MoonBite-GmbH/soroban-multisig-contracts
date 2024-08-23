@@ -290,6 +290,9 @@ impl Multisig {
                 &env,
                 "Multisig: Execute proposal: Trying to execute an expired proposal!"
             );
+            proposal.status = ProposalStatus::Closed;
+            save_proposal(&env, &proposal);
+
             panic_with_error!(&env, ContractError::ProposalExpired);
         }
 
