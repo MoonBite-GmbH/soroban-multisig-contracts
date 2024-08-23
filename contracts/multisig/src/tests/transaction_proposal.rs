@@ -1195,3 +1195,42 @@ fn execute_proposal_should_fail_when_after_deadline() {
 
     multisig.execute_proposal(&member1, &1);
 }
+
+#[test]
+#[should_panic(
+    expected = "Multisig: Create Transaction proposal: Deadline cannot be less than an hour."
+)]
+fn create_transaction_proposal_should_fail_with_invalid_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let members = vec![&env, member1.clone(), member2.clone(), member3.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        None,
+    );
+
+    // create some token for the transaction
+    let token = deploy_token_contract(&env, &member1);
+    token.mint(&multisig.address, &10_000);
+
+    let recipient = Address::generate(&env);
+
+    multisig.create_transaction_proposal(
+        &member1,
+        &String::from_str(&env, "TxTitle#01"),
+        &String::from_str(&env, "TxTestDescription"),
+        &recipient,
+        &10_000,
+        &token.address,
+        // minimum deadline is an hour, we set one that is 1 second shorter than that.
+        &Some(3_599),
+    );
+}

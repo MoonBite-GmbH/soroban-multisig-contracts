@@ -80,3 +80,30 @@ fn update_proposal_should_panic_when_sender_not_a_member() {
     let new_wasm_hash = utils::multisig_wasm_hash(&env);
     multisig.create_update_proposal(&not_a_member, &new_wasm_hash, &None);
 }
+
+#[test]
+#[should_panic(
+    expected = "Multisig: Create Update proposal: Deadline cannot be less than an hour."
+)]
+fn create_update_proposal_should_fail_when_invalid_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.budget().reset_unlimited();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let members = vec![&env, member1.clone(), member2.clone(), member3.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        Some(5_000u32),
+    );
+
+    let new_wasm_hash = utils::multisig_wasm_hash(&env);
+    // 1 second less than an hour
+    multisig.create_update_proposal(&member1, &new_wasm_hash, &Some(3_599));
+}
