@@ -5,6 +5,7 @@ use super::setup::initialize_multisig_contract;
 mod utils {
     use soroban_sdk::{BytesN, Env};
 
+    #[allow(clippy::too_many_arguments)]
     mod multisig {
         soroban_sdk::contractimport!(
             file = "../../target/wasm32-unknown-unknown/release/soroban_multisig.wasm"
