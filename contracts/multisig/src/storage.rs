@@ -7,7 +7,6 @@ pub struct Proposal {
     pub sender: Address,
     pub proposal: ProposalType,
     pub status: ProposalStatus,
-    // NOTE: we can easily go without this if we wanted to
     pub creation_timestamp: u64,
     pub expiration_timestamp: u64,
 }
