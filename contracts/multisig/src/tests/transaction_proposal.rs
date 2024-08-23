@@ -1,4 +1,7 @@
-use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    vec, Address, Env, String,
+};
 
 use super::setup::{deploy_token_contract, initialize_multisig_contract};
 use crate::{
@@ -368,6 +371,49 @@ fn query_all_proposals_with_one_removed() {
     let proposal3 = multisig.query_proposal(&3).unwrap();
 
     assert_eq!(all_proposals_vec, vec![&env, proposal1, proposal3]);
+}
+
+#[test]
+#[should_panic(expected = "Multisig: Sign proposal: Trying to sign an expired proposal!")]
+fn sign_proposal_should_fail_when_signed_after_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.budget().reset_unlimited();
+
+    let member = Address::generate(&env);
+    let members = vec![&env, member.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        None,
+    );
+
+    let token = deploy_token_contract(&env, &member);
+    token.mint(&multisig.address, &25_000);
+
+    let recipient1 = Address::generate(&env);
+    let day_as_timestamp = 86_400u64;
+    let two_weeks_deadline = SEVEN_DAYS_DEADLINE * 2;
+
+    // we start with timestamp at 0
+    multisig.create_transaction_proposal(
+        &member,
+        &String::from_str(&env, "TxTitle#01"),
+        &String::from_str(&env, "TxTestDescription"),
+        &recipient1,
+        &10_000,
+        &token.address,
+        &Some(two_weeks_deadline),
+    );
+
+    // we move time forward
+    env.ledger()
+        .with_mut(|li| li.timestamp = two_weeks_deadline + day_as_timestamp);
+
+    multisig.sign_proposal(&member, &1);
 }
 
 mod non_member {
