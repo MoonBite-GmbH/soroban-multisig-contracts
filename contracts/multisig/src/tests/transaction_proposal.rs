@@ -3,7 +3,9 @@ use soroban_sdk::{
     vec, Address, Env, String,
 };
 
-use super::setup::{deploy_token_contract, initialize_multisig_contract};
+use super::setup::{
+    deploy_token_contract, initialize_multisig_contract, DAY_AS_TIMESTAMP, TWO_WEEKS_DEADLINE,
+};
 use crate::{
     storage::{Proposal, ProposalStatus, ProposalType, Transaction},
     SEVEN_DAYS_DEADLINE,
@@ -395,8 +397,6 @@ fn sign_proposal_should_fail_when_signed_after_deadline() {
     token.mint(&multisig.address, &25_000);
 
     let recipient1 = Address::generate(&env);
-    let day_as_timestamp = 86_400u64;
-    let two_weeks_deadline = SEVEN_DAYS_DEADLINE * 2;
 
     // we start with timestamp at 0
     multisig.create_transaction_proposal(
@@ -406,12 +406,12 @@ fn sign_proposal_should_fail_when_signed_after_deadline() {
         &recipient1,
         &10_000,
         &token.address,
-        &Some(two_weeks_deadline),
+        &Some(TWO_WEEKS_DEADLINE),
     );
 
     // we move time forward
     env.ledger()
-        .with_mut(|li| li.timestamp = two_weeks_deadline + day_as_timestamp);
+        .with_mut(|li| li.timestamp = TWO_WEEKS_DEADLINE + DAY_AS_TIMESTAMP);
 
     multisig.sign_proposal(&member, &1);
 }
@@ -1191,4 +1191,48 @@ fn multiple_active_proposals() {
         multisig.query_proposal(&1).unwrap().status,
         ProposalStatus::Closed
     );
+}
+
+#[test]
+#[should_panic(expected = "Multisig: Execute proposal: Trying to execute an expired proposal!")]
+fn execute_proposal_should_fail_when_after_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let members = vec![&env, member1.clone(), member2.clone(), member3.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        None,
+    );
+
+    let token = deploy_token_contract(&env, &member1);
+    token.mint(&multisig.address, &10_000);
+
+    let recipient = Address::generate(&env);
+
+    multisig.create_transaction_proposal(
+        &member1,
+        &String::from_str(&env, "TxTitle#01"),
+        &String::from_str(&env, "TxTestDescription"),
+        &recipient,
+        &10_000,
+        &token.address,
+        &Some(DAY_AS_TIMESTAMP),
+    );
+
+    multisig.sign_proposal(&member1, &1);
+    multisig.sign_proposal(&member3, &1);
+    multisig.sign_proposal(&member2, &1);
+
+    env.ledger()
+        .with_mut(|li| li.timestamp = TWO_WEEKS_DEADLINE);
+
+    multisig.execute_proposal(&member1, &1);
 }
