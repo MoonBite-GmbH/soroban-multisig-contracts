@@ -244,15 +244,6 @@ impl Multisig {
             panic_with_error!(&env, ContractError::ProposalClosed);
         }
 
-        let curr_timestamp = env.ledger().timestamp();
-        if curr_timestamp > proposal.expiration_timestamp {
-            log!(
-                &env,
-                "Multisig: Sign proposal: Trying to sign an expired proposal!"
-            );
-            panic_with_error!(&env, ContractError::ProposalExpired);
-        }
-
         save_proposal_signature(&env, proposal_id, sender.clone());
 
         env.events()
