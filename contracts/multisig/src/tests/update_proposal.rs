@@ -37,7 +37,7 @@ fn update_proposal_works() {
 
     // it's not actually a new wasm hash, but we need to use it to test the update proposal
     let new_wasm_hash = utils::multisig_wasm_hash(&env);
-    multisig.create_update_proposal(&member1, &new_wasm_hash);
+    multisig.create_update_proposal(&member1, &new_wasm_hash, &None);
 
     let proposal_id = multisig.query_last_proposal_id();
     multisig.sign_proposal(&member1, &proposal_id);
@@ -77,5 +77,5 @@ fn update_proposal_should_panic_when_sender_not_a_member() {
     );
 
     let new_wasm_hash = utils::multisig_wasm_hash(&env);
-    multisig.create_update_proposal(&not_a_member, &new_wasm_hash);
+    multisig.create_update_proposal(&not_a_member, &new_wasm_hash, &None);
 }

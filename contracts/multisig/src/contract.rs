@@ -12,7 +12,7 @@ use crate::{
         save_proposal, save_proposal_signature, save_quorum_bps, save_version, set_initialized,
         set_name, MultisigInfo, Proposal, ProposalStatus, ProposalType, Transaction,
     },
-    token_contract,
+    token_contract, SEVEN_DAYS_DEADLINE,
 };
 use soroban_decimal::Decimal;
 
@@ -89,7 +89,7 @@ impl Multisig {
             .publish(("Multisig", "Initialize description"), description);
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn create_transaction_proposal(
         env: Env,
         sender: Address,
@@ -98,6 +98,7 @@ impl Multisig {
         recipient: Address,
         amount: u64,
         token: Address,
+        deadline: Option<u64>,
     ) {
         sender.require_auth();
 
@@ -137,12 +138,19 @@ impl Multisig {
             title: title.clone(),
             description,
         };
+
+        let creation_timestamp = env.ledger().timestamp();
+        let expiration_timestamp = creation_timestamp + deadline.unwrap_or(SEVEN_DAYS_DEADLINE);
+
         let proposal = Proposal {
             id: proposal_id,
             sender: sender.clone(),
             proposal: ProposalType::Transaction(transaction),
             status: ProposalStatus::Open,
+            creation_timestamp,
+            expiration_timestamp,
         };
+
         save_proposal(&env, &proposal);
 
         env.events()
@@ -152,7 +160,12 @@ impl Multisig {
     }
 
     #[allow(dead_code)]
-    pub fn create_update_proposal(env: Env, sender: Address, new_wasm_hash: BytesN<32>) {
+    pub fn create_update_proposal(
+        env: Env,
+        sender: Address,
+        new_wasm_hash: BytesN<32>,
+        deadline: Option<u64>,
+    ) {
         sender.require_auth();
 
         let multisig = get_multisig_members(&env);
@@ -166,11 +179,16 @@ impl Multisig {
         }
 
         let proposal_id = increment_last_proposal_id(&env);
+        let creation_timestamp = env.ledger().timestamp();
+        let expiration_timestamp = creation_timestamp + deadline.unwrap_or(SEVEN_DAYS_DEADLINE);
+
         let proposal = Proposal {
             id: proposal_id,
             sender: sender.clone(),
             proposal: ProposalType::UpdateContract(new_wasm_hash),
             status: ProposalStatus::Open,
+            creation_timestamp,
+            expiration_timestamp,
         };
         save_proposal(&env, &proposal);
 
@@ -211,6 +229,15 @@ impl Multisig {
             panic_with_error!(&env, ContractError::ProposalClosed);
         }
 
+        let curr_timestamp = env.ledger().timestamp();
+        if curr_timestamp > proposal.expiration_timestamp {
+            log!(
+                &env,
+                "Multisig: Sign proposal: Trying to sign an expired proposal!"
+            );
+            panic_with_error!(&env, ContractError::ProposalExpired);
+        }
+
         save_proposal_signature(&env, proposal_id, sender.clone());
 
         env.events()
@@ -249,6 +276,15 @@ impl Multisig {
                 "Multisig: Execute proposal: Trying to execute a closed proposal!"
             );
             panic_with_error!(&env, ContractError::ProposalClosed);
+        }
+
+        let curr_timestamp = env.ledger().timestamp();
+        if curr_timestamp > proposal.expiration_timestamp {
+            log!(
+                &env,
+                "Multisig: Execute proposal: Trying to execute an expired proposal!"
+            );
+            panic_with_error!(&env, ContractError::ProposalExpired);
         }
 
         // collect all addresses that signed this proposal

@@ -13,5 +13,7 @@ pub mod token_contract {
     );
 }
 
+pub const SEVEN_DAYS_DEADLINE: u64 = 604_800u64;
+
 #[cfg(test)]
 mod tests;

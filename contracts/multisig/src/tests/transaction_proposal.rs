@@ -1,7 +1,10 @@
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
 
 use super::setup::{deploy_token_contract, initialize_multisig_contract};
-use crate::storage::{Proposal, ProposalStatus, ProposalType, Transaction};
+use crate::{
+    storage::{Proposal, ProposalStatus, ProposalType, Transaction},
+    SEVEN_DAYS_DEADLINE,
+};
 
 #[test]
 fn propose_transaction_proposal_full_quorum() {
@@ -34,6 +37,7 @@ fn propose_transaction_proposal_full_quorum() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
     assert_eq!(multisig.query_last_proposal_id(), 1);
 
@@ -49,7 +53,9 @@ fn propose_transaction_proposal_full_quorum() {
                 title: String::from_str(&env, "TxTitle#01"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_DEADLINE
         }
     );
 
@@ -138,6 +144,7 @@ fn remove_proposal() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
 
     assert_eq!(
@@ -152,7 +159,9 @@ fn remove_proposal() {
                 title: String::from_str(&env, "TxTitle#01"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_DEADLINE
         }
     );
 
@@ -186,6 +195,7 @@ fn proposal_name_too_long() {
         &Address::generate(&env),
         &10_000,
         &deploy_token_contract(&env, &member1).address,
+        &None,
     );
 }
 
@@ -213,6 +223,7 @@ fn proposal_description_too_long() {
         &Address::generate(&env),
         &10_000,
         &deploy_token_contract(&env, &member1).address,
+        &None,
     );
 }
 
@@ -246,6 +257,7 @@ fn sign_invalid_proposal() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
 
     // only proposal with ID 1 exists now
@@ -283,6 +295,7 @@ fn sign_removed_proposal() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
 
     // First member is able to vote for this proposal
@@ -324,6 +337,7 @@ fn query_all_proposals_with_one_removed() {
         &recipient1,
         &10_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member1,
@@ -332,6 +346,7 @@ fn query_all_proposals_with_one_removed() {
         &recipient2,
         &15_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member1,
@@ -340,6 +355,7 @@ fn query_all_proposals_with_one_removed() {
         &recipient1,
         &5_000,
         &token.address,
+        &None,
     );
     assert_eq!(multisig.query_last_proposal_id(), 3);
 
@@ -384,6 +400,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
     }
 
@@ -414,6 +431,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
 
         multisig.sign_proposal(&random, &1);
@@ -446,6 +464,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
 
         multisig.sign_proposal(&member1, &1);
@@ -480,6 +499,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
 
         multisig.remove_proposal(&random, &1);
@@ -521,6 +541,7 @@ mod closed_proposal {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // vote above quorum and execute it
@@ -567,6 +588,7 @@ mod closed_proposal {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // vote above quorum and execute it
@@ -617,6 +639,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature gives bigger ratio then threshold required
@@ -673,6 +696,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature gives ratio equal to the quorum
@@ -730,6 +754,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature is not enough and execution will fail
@@ -798,6 +823,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature is not enough and execution will fail
@@ -880,6 +906,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature is not enough and execution will fail
@@ -959,6 +986,7 @@ fn multiple_active_proposals() {
         &recipient1,
         &10_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member3,
@@ -967,6 +995,7 @@ fn multiple_active_proposals() {
         &recipient2,
         &15_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member2,
@@ -975,6 +1004,7 @@ fn multiple_active_proposals() {
         &recipient1,
         &5_000,
         &token2.address,
+        &None,
     );
     assert_eq!(multisig.query_last_proposal_id(), 3);
 
@@ -990,7 +1020,9 @@ fn multiple_active_proposals() {
                 title: String::from_str(&env, "TxTitle#01"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_DEADLINE
         }
     );
     assert_eq!(
@@ -1005,7 +1037,9 @@ fn multiple_active_proposals() {
                 title: String::from_str(&env, "TxTitle#02"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_DEADLINE
         }
     );
     assert_eq!(
@@ -1020,7 +1054,9 @@ fn multiple_active_proposals() {
                 title: String::from_str(&env, "TxTitle#03"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_DEADLINE
         }
     );
 
