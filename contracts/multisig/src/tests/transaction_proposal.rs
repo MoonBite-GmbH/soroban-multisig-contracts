@@ -1235,3 +1235,88 @@ fn create_transaction_proposal_should_fail_with_invalid_expiration_date() {
         &Some(3_599),
     );
 }
+
+#[test]
+fn create_and_execute_transaction_proposal_within_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let members = vec![&env, member1.clone(), member2.clone(), member3.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        None,
+    );
+
+    // create some token for the transaction
+    let token = deploy_token_contract(&env, &member1);
+    token.mint(&multisig.address, &10_000);
+
+    let recipient = Address::generate(&env);
+
+    multisig.create_transaction_proposal(
+        &member1,
+        &String::from_str(&env, "TxTitle#01"),
+        &String::from_str(&env, "TxTestDescription"),
+        &recipient,
+        &10_000,
+        &token.address,
+        // tx proposal with 10 days validity from the date of creation
+        &Some(TWO_WEEKS_EXPIRATION_DATE - 4 * DAY_AS_TIMESTAMP),
+    );
+    assert_eq!(multisig.query_last_proposal_id(), 1);
+
+    assert_eq!(
+        multisig.query_proposal(&1).unwrap(),
+        Proposal {
+            id: 1,
+            sender: member1.clone(),
+            proposal: ProposalType::Transaction(Transaction {
+                token: token.address.clone(),
+                amount: 10_000,
+                recipient: recipient.clone(),
+                title: String::from_str(&env, "TxTitle#01"),
+                description: String::from_str(&env, "TxTestDescription")
+            }),
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: TWO_WEEKS_EXPIRATION_DATE - 4 * DAY_AS_TIMESTAMP,
+        }
+    );
+
+    // each member signs a few days after the proposal has been created
+    env.ledger().with_mut(|li| li.timestamp = DAY_AS_TIMESTAMP);
+    multisig.sign_proposal(&member1, &1);
+
+    env.ledger()
+        .with_mut(|li| li.timestamp = DAY_AS_TIMESTAMP * 2);
+    multisig.sign_proposal(&member3, &1);
+
+    env.ledger()
+        .with_mut(|li| li.timestamp = DAY_AS_TIMESTAMP * 3);
+    multisig.sign_proposal(&member2, &1);
+
+    // before executing the transaction, let's make sure there is no previous balance
+    assert_eq!(token.balance(&recipient), 0i128);
+    assert_eq!(token.balance(&multisig.address), 10_000i128);
+
+    // proposal is execute within the 1st week, 3 days before expiration date
+    env.ledger()
+        .with_mut(|li| li.timestamp = TWO_WEEKS_EXPIRATION_DATE / 2);
+
+    multisig.execute_proposal(&member1, &1);
+
+    assert_eq!(token.balance(&recipient), 10_000i128);
+    assert_eq!(token.balance(&multisig.address), 0i128);
+
+    assert_eq!(
+        multisig.query_proposal(&1).unwrap().status,
+        ProposalStatus::Closed
+    );
+}
