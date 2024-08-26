@@ -12,7 +12,7 @@ use crate::{
         save_proposal, save_proposal_signature, save_quorum_bps, save_version, set_initialized,
         set_name, MultisigInfo, Proposal, ProposalStatus, ProposalType, Transaction,
     },
-    token_contract, ONE_HOUR, SEVEN_DAYS_DEADLINE,
+    token_contract, ONE_HOUR, SEVEN_DAYS_EXPIRATION_DATE,
 };
 use soroban_decimal::Decimal;
 
@@ -98,7 +98,7 @@ impl Multisig {
         recipient: Address,
         amount: u64,
         token: Address,
-        deadline: Option<u64>,
+        expiration_date: Option<u64>,
     ) {
         sender.require_auth();
 
@@ -140,13 +140,14 @@ impl Multisig {
         };
 
         let creation_timestamp = env.ledger().timestamp();
-        let expiration_timestamp = creation_timestamp + deadline.unwrap_or(SEVEN_DAYS_DEADLINE);
+        let expiration_timestamp = creation_timestamp
+            + expiration_date.unwrap_or(creation_timestamp + SEVEN_DAYS_EXPIRATION_DATE);
         if expiration_timestamp < creation_timestamp + ONE_HOUR {
             log!(
                 &env,
-                "Multisig: Create Transaction proposal: Deadline cannot be less than an hour."
+                "Multisig: Create Transaction proposal: Expiration date cannot be less than an hour."
             );
-            panic_with_error!(&env, ContractError::InvalidDeadline);
+            panic_with_error!(&env, ContractError::InvalidExpirationDate);
         }
 
         let proposal = Proposal {
@@ -171,7 +172,7 @@ impl Multisig {
         env: Env,
         sender: Address,
         new_wasm_hash: BytesN<32>,
-        deadline: Option<u64>,
+        expiration_date: Option<u64>,
     ) {
         sender.require_auth();
 
@@ -187,14 +188,15 @@ impl Multisig {
 
         let proposal_id = increment_last_proposal_id(&env);
         let creation_timestamp = env.ledger().timestamp();
-        let expiration_timestamp = creation_timestamp + deadline.unwrap_or(SEVEN_DAYS_DEADLINE);
+        let expiration_timestamp = creation_timestamp
+            + expiration_date.unwrap_or(creation_timestamp + SEVEN_DAYS_EXPIRATION_DATE);
 
         if expiration_timestamp < creation_timestamp + ONE_HOUR {
             log!(
                 &env,
-                "Multisig: Create Update proposal: Deadline cannot be less than an hour."
+                "Multisig: Create Update proposal: Expiration date cannot be less than an hour."
             );
-            panic_with_error!(&env, ContractError::InvalidDeadline);
+            panic_with_error!(&env, ContractError::InvalidExpirationDate);
         }
 
         let proposal = Proposal {

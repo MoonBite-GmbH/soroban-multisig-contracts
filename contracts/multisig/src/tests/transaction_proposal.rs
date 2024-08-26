@@ -4,11 +4,12 @@ use soroban_sdk::{
 };
 
 use super::setup::{
-    deploy_token_contract, initialize_multisig_contract, DAY_AS_TIMESTAMP, TWO_WEEKS_DEADLINE,
+    deploy_token_contract, initialize_multisig_contract, DAY_AS_TIMESTAMP,
+    TWO_WEEKS_EXPIRATION_DATE,
 };
 use crate::{
     storage::{Proposal, ProposalStatus, ProposalType, Transaction},
-    SEVEN_DAYS_DEADLINE,
+    SEVEN_DAYS_EXPIRATION_DATE,
 };
 
 #[test]
@@ -60,7 +61,7 @@ fn propose_transaction_proposal_full_quorum() {
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
-            expiration_timestamp: SEVEN_DAYS_DEADLINE
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
 
@@ -166,7 +167,7 @@ fn remove_proposal() {
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
-            expiration_timestamp: SEVEN_DAYS_DEADLINE
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
 
@@ -1027,7 +1028,7 @@ fn multiple_active_proposals() {
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
-            expiration_timestamp: SEVEN_DAYS_DEADLINE
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
     assert_eq!(
@@ -1044,7 +1045,7 @@ fn multiple_active_proposals() {
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
-            expiration_timestamp: SEVEN_DAYS_DEADLINE
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
     assert_eq!(
@@ -1061,7 +1062,7 @@ fn multiple_active_proposals() {
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
-            expiration_timestamp: SEVEN_DAYS_DEADLINE
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
 
@@ -1154,7 +1155,7 @@ fn multiple_active_proposals() {
 
 #[test]
 #[should_panic(expected = "Multisig: Execute proposal: Trying to execute an expired proposal!")]
-fn execute_proposal_should_fail_when_after_deadline() {
+fn execute_proposal_should_fail_when_after_expiration_date() {
     let env = Env::default();
     env.mock_all_auths();
 
@@ -1191,16 +1192,16 @@ fn execute_proposal_should_fail_when_after_deadline() {
     multisig.sign_proposal(&member2, &1);
 
     env.ledger()
-        .with_mut(|li| li.timestamp = TWO_WEEKS_DEADLINE);
+        .with_mut(|li| li.timestamp = TWO_WEEKS_EXPIRATION_DATE);
 
     multisig.execute_proposal(&member1, &1);
 }
 
 #[test]
 #[should_panic(
-    expected = "Multisig: Create Transaction proposal: Deadline cannot be less than an hour."
+    expected = "Multisig: Create Transaction proposal: Expiration date cannot be less than an hour."
 )]
-fn create_transaction_proposal_should_fail_with_invalid_deadline() {
+fn create_transaction_proposal_should_fail_with_invalid_expiration_date() {
     let env = Env::default();
     env.mock_all_auths();
 
@@ -1230,7 +1231,7 @@ fn create_transaction_proposal_should_fail_with_invalid_deadline() {
         &recipient,
         &10_000,
         &token.address,
-        // minimum deadline is an hour, we set one that is 1 second shorter than that.
+        // minimum expiration date is an hour after creation, we set one that is 1 second shorter than that.
         &Some(3_599),
     );
 }

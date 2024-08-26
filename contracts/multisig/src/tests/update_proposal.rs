@@ -83,9 +83,9 @@ fn update_proposal_should_panic_when_sender_not_a_member() {
 
 #[test]
 #[should_panic(
-    expected = "Multisig: Create Update proposal: Deadline cannot be less than an hour."
+    expected = "Multisig: Create Update proposal: Expiration date cannot be less than an hour."
 )]
-fn create_update_proposal_should_fail_when_invalid_deadline() {
+fn create_update_proposal_should_fail_when_invalid_expiration_date() {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
