@@ -43,12 +43,14 @@ The Multisig contract handles the creation, signing, and execution of proposals.
   - `recipient`: The recipient address of the transaction.
   - `amount`: The amount to be transferred.
   - `token`: The token address.
+  - `expiration_date`: Option<u64> The expiration date after the creation of the proposal. If `None` is set then 7 days will be placed automatically.
 
 #### `create_update_proposal`
 - **Parameters:**
   - `env`: The environment in which the contract is executed.
   - `sender`: The address of the proposal creator.
   - `new_wasm_hash`: The new WASM hash.
+  - `expiration_date`: Option<u64> The expiration date after the creation of the proposal. If `None` is set then 7 days will be placed automatically.
 
 #### `sign_proposal`
 - **Parameters:**
