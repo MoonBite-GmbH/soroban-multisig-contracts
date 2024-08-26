@@ -1,7 +1,16 @@
-use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    vec, Address, Env, String,
+};
 
-use super::setup::{deploy_token_contract, initialize_multisig_contract};
-use crate::storage::{Proposal, ProposalStatus, ProposalType, Transaction};
+use super::setup::{
+    deploy_token_contract, initialize_multisig_contract, DAY_AS_TIMESTAMP,
+    TWO_WEEKS_EXPIRATION_DATE,
+};
+use crate::{
+    storage::{Proposal, ProposalStatus, ProposalType, Transaction},
+    SEVEN_DAYS_EXPIRATION_DATE,
+};
 
 #[test]
 fn propose_transaction_proposal_full_quorum() {
@@ -34,6 +43,7 @@ fn propose_transaction_proposal_full_quorum() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
     assert_eq!(multisig.query_last_proposal_id(), 1);
 
@@ -49,7 +59,9 @@ fn propose_transaction_proposal_full_quorum() {
                 title: String::from_str(&env, "TxTitle#01"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
 
@@ -138,6 +150,7 @@ fn remove_proposal() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
 
     assert_eq!(
@@ -152,7 +165,9 @@ fn remove_proposal() {
                 title: String::from_str(&env, "TxTitle#01"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
 
@@ -186,6 +201,7 @@ fn proposal_name_too_long() {
         &Address::generate(&env),
         &10_000,
         &deploy_token_contract(&env, &member1).address,
+        &None,
     );
 }
 
@@ -213,6 +229,7 @@ fn proposal_description_too_long() {
         &Address::generate(&env),
         &10_000,
         &deploy_token_contract(&env, &member1).address,
+        &None,
     );
 }
 
@@ -246,6 +263,7 @@ fn sign_invalid_proposal() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
 
     // only proposal with ID 1 exists now
@@ -283,6 +301,7 @@ fn sign_removed_proposal() {
         &recipient,
         &10_000,
         &token.address,
+        &None,
     );
 
     // First member is able to vote for this proposal
@@ -324,6 +343,7 @@ fn query_all_proposals_with_one_removed() {
         &recipient1,
         &10_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member1,
@@ -332,6 +352,7 @@ fn query_all_proposals_with_one_removed() {
         &recipient2,
         &15_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member1,
@@ -340,6 +361,7 @@ fn query_all_proposals_with_one_removed() {
         &recipient1,
         &5_000,
         &token.address,
+        &None,
     );
     assert_eq!(multisig.query_last_proposal_id(), 3);
 
@@ -384,6 +406,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
     }
 
@@ -414,6 +437,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
 
         multisig.sign_proposal(&random, &1);
@@ -446,6 +470,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
 
         multisig.sign_proposal(&member1, &1);
@@ -480,6 +505,7 @@ mod non_member {
             &recipient,
             &10_000,
             &deploy_token_contract(&env, &member1).address,
+            &None,
         );
 
         multisig.remove_proposal(&random, &1);
@@ -521,6 +547,7 @@ mod closed_proposal {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // vote above quorum and execute it
@@ -567,6 +594,7 @@ mod closed_proposal {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // vote above quorum and execute it
@@ -617,6 +645,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature gives bigger ratio then threshold required
@@ -673,6 +702,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature gives ratio equal to the quorum
@@ -730,6 +760,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature is not enough and execution will fail
@@ -798,6 +829,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature is not enough and execution will fail
@@ -880,6 +912,7 @@ mod quorum {
             &recipient,
             &10_000,
             &token.address,
+            &None,
         );
 
         // One signature is not enough and execution will fail
@@ -959,6 +992,7 @@ fn multiple_active_proposals() {
         &recipient1,
         &10_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member3,
@@ -967,6 +1001,7 @@ fn multiple_active_proposals() {
         &recipient2,
         &15_000,
         &token.address,
+        &None,
     );
     multisig.create_transaction_proposal(
         &member2,
@@ -975,6 +1010,7 @@ fn multiple_active_proposals() {
         &recipient1,
         &5_000,
         &token2.address,
+        &None,
     );
     assert_eq!(multisig.query_last_proposal_id(), 3);
 
@@ -990,7 +1026,9 @@ fn multiple_active_proposals() {
                 title: String::from_str(&env, "TxTitle#01"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
     assert_eq!(
@@ -1005,7 +1043,9 @@ fn multiple_active_proposals() {
                 title: String::from_str(&env, "TxTitle#02"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
     assert_eq!(
@@ -1020,7 +1060,9 @@ fn multiple_active_proposals() {
                 title: String::from_str(&env, "TxTitle#03"),
                 description: String::from_str(&env, "TxTestDescription")
             }),
-            status: ProposalStatus::Open
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
         }
     );
 
@@ -1105,6 +1147,174 @@ fn multiple_active_proposals() {
     multisig.execute_proposal(&member1, &1);
     assert_eq!(token.balance(&recipient1), 10_000i128);
     assert_eq!(token.balance(&multisig.address), 0i128);
+    assert_eq!(
+        multisig.query_proposal(&1).unwrap().status,
+        ProposalStatus::Closed
+    );
+}
+
+#[test]
+#[should_panic(expected = "Multisig: Execute proposal: Trying to execute an expired proposal!")]
+fn execute_proposal_should_fail_when_after_expiration_date() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let members = vec![&env, member1.clone(), member2.clone(), member3.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        None,
+    );
+
+    let token = deploy_token_contract(&env, &member1);
+    token.mint(&multisig.address, &10_000);
+
+    let recipient = Address::generate(&env);
+
+    multisig.create_transaction_proposal(
+        &member1,
+        &String::from_str(&env, "TxTitle#01"),
+        &String::from_str(&env, "TxTestDescription"),
+        &recipient,
+        &10_000,
+        &token.address,
+        &Some(DAY_AS_TIMESTAMP),
+    );
+
+    multisig.sign_proposal(&member1, &1);
+    multisig.sign_proposal(&member3, &1);
+    multisig.sign_proposal(&member2, &1);
+
+    env.ledger()
+        .with_mut(|li| li.timestamp = TWO_WEEKS_EXPIRATION_DATE);
+
+    multisig.execute_proposal(&member1, &1);
+}
+
+#[test]
+#[should_panic(
+    expected = "Multisig: Create Transaction proposal: Expiration date cannot be less than an hour."
+)]
+fn create_transaction_proposal_should_fail_with_invalid_expiration_date() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let members = vec![&env, member1.clone(), member2.clone(), member3.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        None,
+    );
+
+    // create some token for the transaction
+    let token = deploy_token_contract(&env, &member1);
+    token.mint(&multisig.address, &10_000);
+
+    let recipient = Address::generate(&env);
+
+    multisig.create_transaction_proposal(
+        &member1,
+        &String::from_str(&env, "TxTitle#01"),
+        &String::from_str(&env, "TxTestDescription"),
+        &recipient,
+        &10_000,
+        &token.address,
+        // minimum expiration date is an hour after creation, we set one that is 1 second shorter than that.
+        &Some(3_599),
+    );
+}
+
+#[test]
+fn create_and_execute_transaction_proposal_within_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let members = vec![&env, member1.clone(), member2.clone(), member3.clone()];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        None,
+    );
+
+    // create some token for the transaction
+    let token = deploy_token_contract(&env, &member1);
+    token.mint(&multisig.address, &10_000);
+
+    let recipient = Address::generate(&env);
+
+    multisig.create_transaction_proposal(
+        &member1,
+        &String::from_str(&env, "TxTitle#01"),
+        &String::from_str(&env, "TxTestDescription"),
+        &recipient,
+        &10_000,
+        &token.address,
+        // tx proposal with 10 days validity from the date of creation
+        &Some(TWO_WEEKS_EXPIRATION_DATE - 4 * DAY_AS_TIMESTAMP),
+    );
+    assert_eq!(multisig.query_last_proposal_id(), 1);
+
+    assert_eq!(
+        multisig.query_proposal(&1).unwrap(),
+        Proposal {
+            id: 1,
+            sender: member1.clone(),
+            proposal: ProposalType::Transaction(Transaction {
+                token: token.address.clone(),
+                amount: 10_000,
+                recipient: recipient.clone(),
+                title: String::from_str(&env, "TxTitle#01"),
+                description: String::from_str(&env, "TxTestDescription")
+            }),
+            status: ProposalStatus::Open,
+            creation_timestamp: 0,
+            expiration_timestamp: TWO_WEEKS_EXPIRATION_DATE - 4 * DAY_AS_TIMESTAMP,
+        }
+    );
+
+    // each member signs a few days after the proposal has been created
+    env.ledger().with_mut(|li| li.timestamp = DAY_AS_TIMESTAMP);
+    multisig.sign_proposal(&member1, &1);
+
+    env.ledger()
+        .with_mut(|li| li.timestamp = DAY_AS_TIMESTAMP * 2);
+    multisig.sign_proposal(&member3, &1);
+
+    env.ledger()
+        .with_mut(|li| li.timestamp = DAY_AS_TIMESTAMP * 3);
+    multisig.sign_proposal(&member2, &1);
+
+    // before executing the transaction, let's make sure there is no previous balance
+    assert_eq!(token.balance(&recipient), 0i128);
+    assert_eq!(token.balance(&multisig.address), 10_000i128);
+
+    // proposal is execute within the 1st week, 3 days before expiration date
+    env.ledger()
+        .with_mut(|li| li.timestamp = TWO_WEEKS_EXPIRATION_DATE / 2);
+
+    multisig.execute_proposal(&member1, &1);
+
+    assert_eq!(token.balance(&recipient), 10_000i128);
+    assert_eq!(token.balance(&multisig.address), 0i128);
+
     assert_eq!(
         multisig.query_proposal(&1).unwrap().status,
         ProposalStatus::Closed

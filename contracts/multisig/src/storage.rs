@@ -7,6 +7,8 @@ pub struct Proposal {
     pub sender: Address,
     pub proposal: ProposalType,
     pub status: ProposalStatus,
+    pub creation_timestamp: u64,
+    pub expiration_timestamp: u64,
 }
 
 #[contracttype]

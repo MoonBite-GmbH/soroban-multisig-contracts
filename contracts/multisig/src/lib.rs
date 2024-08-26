@@ -13,5 +13,8 @@ pub mod token_contract {
     );
 }
 
+pub const ONE_HOUR: u64 = 3_600u64;
+pub const SEVEN_DAYS_EXPIRATION_DATE: u64 = 604_800u64;
+
 #[cfg(test)]
 mod tests;

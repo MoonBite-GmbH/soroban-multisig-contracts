@@ -14,4 +14,6 @@ pub enum ContractError {
     ProposalClosed = 7,
     QuorumNotReached = 8,
     ProposalNotFound = 9,
+    ProposalExpired = 10,
+    InvalidExpirationDate = 11,
 }
