@@ -30,7 +30,7 @@ fn initialize_multisig() {
     };
     assert_eq!(multisig.query_multisig_info(), expected_response);
     assert_eq!(multisig.query_multisig_members(), members);
-    assert_eq!(multisig.query_last_proposal_id(), 0u32);
+    assert_eq!(multisig.query_last_proposal_id(), 0u64);
 }
 
 #[test]

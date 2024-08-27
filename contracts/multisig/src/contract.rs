@@ -218,7 +218,7 @@ impl Multisig {
     }
 
     #[allow(dead_code)]
-    pub fn sign_proposal(env: Env, sender: Address, proposal_id: u32) {
+    pub fn sign_proposal(env: Env, sender: Address, proposal_id: u64) {
         sender.require_auth();
 
         let multisig = get_multisig_members(&env);
@@ -257,7 +257,7 @@ impl Multisig {
     }
 
     #[allow(dead_code)]
-    pub fn execute_proposal(env: Env, sender: Address, proposal_id: u32) {
+    pub fn execute_proposal(env: Env, sender: Address, proposal_id: u64) {
         sender.require_auth();
 
         let mut proposal = get_proposal(&env, proposal_id).unwrap_or_else(|| {
@@ -369,12 +369,12 @@ impl Multisig {
     }
 
     #[allow(dead_code)]
-    pub fn query_proposal(env: Env, proposal_id: u32) -> Option<Proposal> {
+    pub fn query_proposal(env: Env, proposal_id: u64) -> Option<Proposal> {
         get_proposal(&env, proposal_id)
     }
 
     #[allow(dead_code)]
-    pub fn query_signatures(env: Env, proposal_id: u32) -> Vec<(Address, bool)> {
+    pub fn query_signatures(env: Env, proposal_id: u64) -> Vec<(Address, bool)> {
         let multisig = get_multisig_members(&env);
         // collect all addresses that signed this proposal
         let proposal_signatures = get_proposal_signatures(&env, proposal_id);
@@ -392,7 +392,7 @@ impl Multisig {
     }
 
     #[allow(dead_code)]
-    pub fn query_last_proposal_id(env: Env) -> u32 {
+    pub fn query_last_proposal_id(env: Env) -> u64 {
         get_last_proposal_id(&env)
     }
 

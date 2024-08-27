@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, map, Address, BytesN, Env, Map, String, Vec};
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Proposal {
-    pub id: u32,
+    pub id: u64,
     pub sender: Address,
     pub proposal: ProposalType,
     pub status: ProposalStatus,
@@ -61,10 +61,10 @@ pub enum DataKey {
     // Unique identifier for each new proposal to sign
     LastProposalId,
     // Details of the tranasction proposal
-    Proposal(u32),
+    Proposal(u64),
     // Record of signatures to each transaction proposal
     // TODO: Add method to clean up memory when the transaction is executed
-    ProposalSignatures(u32),
+    ProposalSignatures(u64),
     Version,
 }
 
@@ -141,20 +141,20 @@ pub fn save_new_multisig(env: &Env, members: &Vec<Address>) {
 // -------------
 
 // Returns ID for the new proposal and increments the value in the memory for the future one
-pub fn increment_last_proposal_id(env: &Env) -> u32 {
+pub fn increment_last_proposal_id(env: &Env) -> u64 {
     let id = env
         .storage()
         .persistent()
-        .get::<_, u32>(&DataKey::LastProposalId)
+        .get::<_, u64>(&DataKey::LastProposalId)
         .unwrap_or_default()
-        + 1u32;
+        + 1u64;
     env.storage()
         .persistent()
         .set(&DataKey::LastProposalId, &id);
     id
 }
 
-pub fn get_last_proposal_id(env: &Env) -> u32 {
+pub fn get_last_proposal_id(env: &Env) -> u64 {
     env.storage()
         .persistent()
         .get(&DataKey::LastProposalId)
@@ -169,7 +169,7 @@ pub fn save_proposal(env: &Env, proposal: &Proposal) {
         .set(&DataKey::Proposal(proposal.id), proposal);
 }
 
-pub fn get_proposal(env: &Env, proposal_id: u32) -> Option<Proposal> {
+pub fn get_proposal(env: &Env, proposal_id: u64) -> Option<Proposal> {
     env.storage()
         .persistent()
         .get(&DataKey::Proposal(proposal_id))
@@ -178,7 +178,7 @@ pub fn get_proposal(env: &Env, proposal_id: u32) -> Option<Proposal> {
 // -------------
 
 // When user signes the given proposal, save an information about it
-pub fn save_proposal_signature(e: &Env, proposal_id: u32, signer: Address) {
+pub fn save_proposal_signature(e: &Env, proposal_id: u64, signer: Address) {
     let mut proposal_signatures: Map<Address, ()> = get_proposal_signatures(e, proposal_id);
     proposal_signatures.set(signer, ());
 
@@ -188,7 +188,7 @@ pub fn save_proposal_signature(e: &Env, proposal_id: u32, signer: Address) {
     );
 }
 
-pub fn get_proposal_signatures(env: &Env, proposal_id: u32) -> Map<Address, ()> {
+pub fn get_proposal_signatures(env: &Env, proposal_id: u64) -> Map<Address, ()> {
     env.storage()
         .persistent()
         .get(&DataKey::ProposalSignatures(proposal_id))
