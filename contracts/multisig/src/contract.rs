@@ -12,7 +12,7 @@ use crate::{
         save_proposal_signature, save_quorum_bps, save_version, set_initialized, set_name,
         MultisigInfo, Proposal, ProposalStatus, ProposalType, Transaction,
     },
-    token_contract, ONE_HOUR, SEVEN_DAYS_EXPIRATION_DATE,
+    token_contract, ONE_HOUR, SEVEN_DAYS_EXPIRATION_DATE, SOROBAN_ZERO_ADDRESS,
 };
 use soroban_decimal::Decimal;
 
@@ -36,6 +36,8 @@ impl Multisig {
         members: Vec<Address>,
         quorum_bps: Option<u32>,
     ) {
+        verify_members(&env, &members);
+
         if is_initialized(&env) {
             log!(
                 &env,
@@ -408,5 +410,73 @@ impl Multisig {
             });
         }
         proposals
+    }
+}
+
+fn verify_members(env: &Env, members: &Vec<Address>) {
+    if members.is_empty() {
+        log!(
+            &env,
+            "Multisig: Initialize: cannot initialize multisig without any members!"
+        );
+        panic_with_error!(&env, ContractError::MembersListEmpty);
+    }
+
+    let zero_address = Address::from_string(&String::from_str(env, SOROBAN_ZERO_ADDRESS));
+
+    if members.iter().any(|addr| addr == zero_address) {
+        log!(
+            &env,
+            "Multisig: Initialize: Stellar's zero address provided as member. Aborting"
+        );
+        panic_with_error!(&env, ContractError::ZeroAddressProvided);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use soroban_sdk::{testutils::Address as _, vec, Address, Env, String, Vec};
+
+    use crate::SOROBAN_ZERO_ADDRESS;
+
+    use super::verify_members;
+
+    #[test]
+    #[should_panic(
+        expected = "Multisig: Initialize: cannot initialize multisig without any members!"
+    )]
+    fn verify_members_should_panic_when_members_is_empty() {
+        let env = Env::default();
+        let members: Vec<Address> = vec![&env];
+
+        verify_members(&env, &members);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Multisig: Initialize: Stellar's zero address provided as member. Aborting"
+    )]
+    fn verify_members_should_panic_when_stellar_zero_addres_is_member() {
+        let env = Env::default();
+
+        let zero_address = Address::from_string(&String::from_str(&env, SOROBAN_ZERO_ADDRESS));
+
+        let members: Vec<Address> = vec![
+            &env,
+            Address::generate(&env),
+            Address::generate(&env),
+            zero_address,
+        ];
+
+        verify_members(&env, &members);
+    }
+
+    #[test]
+    fn verify_members_should_work() {
+        let env = Env::default();
+
+        let members: Vec<Address> = vec![&env, Address::generate(&env), Address::generate(&env)];
+
+        verify_members(&env, &members);
     }
 }
