@@ -1,5 +1,7 @@
 use soroban_sdk::{contracttype, map, Address, BytesN, Env, Map, String, Vec};
 
+use crate::{BUMP_AMOUNT, LIFETIME_THRESHOLD};
+
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Proposal {
@@ -70,13 +72,30 @@ pub enum DataKey {
 
 pub fn set_initialized(env: &Env) {
     env.storage().persistent().set(&DataKey::IsInitialized, &());
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::IsInitialized, LIFETIME_THRESHOLD, BUMP_AMOUNT);
 }
 
 pub fn is_initialized(env: &Env) -> bool {
-    env.storage()
+    let is_initialized = env
+        .storage()
         .persistent()
         .get::<_, ()>(&DataKey::IsInitialized)
-        .is_some()
+        .is_some();
+
+    env.storage()
+        .persistent()
+        .has(&DataKey::IsInitialized)
+        .then(|| {
+            env.storage().persistent().extend_ttl(
+                &DataKey::IsInitialized,
+                LIFETIME_THRESHOLD,
+                BUMP_AMOUNT,
+            )
+        });
+
+    is_initialized
 }
 
 // -------------
@@ -85,36 +104,79 @@ pub fn set_name(env: &Env, name: String, description: String) {
     env.storage()
         .persistent()
         .set(&DataKey::NameDescription, &(name, description));
+    env.storage().persistent().extend_ttl(
+        &DataKey::NameDescription,
+        LIFETIME_THRESHOLD,
+        BUMP_AMOUNT,
+    );
 }
 
 pub fn get_name(env: &Env) -> (String, String) {
-    env.storage()
+    let name_tuple = env
+        .storage()
         .persistent()
         .get(&DataKey::NameDescription)
-        .unwrap()
+        .unwrap();
+    env.storage()
+        .persistent()
+        .has(&DataKey::NameDescription)
+        .then(|| {
+            env.storage().persistent().extend_ttl(
+                &DataKey::NameDescription,
+                LIFETIME_THRESHOLD,
+                BUMP_AMOUNT,
+            );
+        });
+
+    name_tuple
 }
 
 // -------------
 
 pub fn get_quorum_bps(env: &Env) -> u32 {
-    env.storage().persistent().get(&DataKey::QuorumBps).unwrap()
+    let quorum_bps = env.storage().persistent().get(&DataKey::QuorumBps).unwrap();
+
+    env.storage()
+        .persistent()
+        .has(&DataKey::QuorumBps)
+        .then(|| {
+            env.storage().persistent().extend_ttl(
+                &DataKey::QuorumBps,
+                LIFETIME_THRESHOLD,
+                BUMP_AMOUNT,
+            );
+        });
+
+    quorum_bps
 }
 
 pub fn save_quorum_bps(env: &Env, quorum_bps: u32) {
     env.storage()
         .persistent()
         .set(&DataKey::QuorumBps, &quorum_bps);
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::QuorumBps, LIFETIME_THRESHOLD, BUMP_AMOUNT);
 }
 
 // -------------
 
 pub fn get_multisig_members(env: &Env) -> Map<Address, ()> {
-    env.storage()
+    let members = env
+        .storage()
         .persistent()
         .get(&DataKey::Multisig)
         // This vector is set during initialization
         // if it fails to load, it's a critical error
-        .unwrap()
+        .unwrap();
+
+    env.storage().persistent().has(&DataKey::Multisig).then(|| {
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Multisig, LIFETIME_THRESHOLD, BUMP_AMOUNT);
+    });
+
+    members
 }
 
 #[allow(dead_code)]
@@ -125,6 +187,9 @@ pub fn add_multisig_member(env: &Env, member: Address) {
     env.storage()
         .persistent()
         .set(&DataKey::Multisig, &multisig);
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::Multisig, LIFETIME_THRESHOLD, BUMP_AMOUNT);
 }
 
 pub fn save_new_multisig(env: &Env, members: &Vec<Address>) {
@@ -136,6 +201,9 @@ pub fn save_new_multisig(env: &Env, members: &Vec<Address>) {
     env.storage()
         .persistent()
         .set(&DataKey::Multisig, &multisig);
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::Multisig, LIFETIME_THRESHOLD, BUMP_AMOUNT);
 }
 
 // -------------
@@ -151,14 +219,35 @@ pub fn increment_last_proposal_id(env: &Env) -> u64 {
     env.storage()
         .persistent()
         .set(&DataKey::LastProposalId, &id);
+
+    env.storage().persistent().extend_ttl(
+        &DataKey::LastProposalId,
+        LIFETIME_THRESHOLD,
+        BUMP_AMOUNT,
+    );
+
     id
 }
 
 pub fn get_last_proposal_id(env: &Env) -> u64 {
-    env.storage()
+    let last_id = env
+        .storage()
         .persistent()
         .get(&DataKey::LastProposalId)
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    env.storage()
+        .persistent()
+        .has(&DataKey::LastProposalId)
+        .then(|| {
+            env.storage().persistent().extend_ttl(
+                &DataKey::LastProposalId,
+                LIFETIME_THRESHOLD,
+                BUMP_AMOUNT,
+            );
+        });
+
+    last_id
 }
 
 // -------------
@@ -167,12 +256,31 @@ pub fn save_proposal(env: &Env, proposal: &Proposal) {
     env.storage()
         .persistent()
         .set(&DataKey::Proposal(proposal.id), proposal);
+    env.storage().persistent().extend_ttl(
+        &DataKey::Proposal(proposal.id),
+        LIFETIME_THRESHOLD,
+        BUMP_AMOUNT,
+    );
 }
 
 pub fn get_proposal(env: &Env, proposal_id: u64) -> Option<Proposal> {
+    let proposal = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Proposal(proposal_id));
+
     env.storage()
         .persistent()
-        .get(&DataKey::Proposal(proposal_id))
+        .has(&DataKey::Proposal(proposal_id))
+        .then(|| {
+            env.storage().persistent().extend_ttl(
+                &DataKey::Proposal(proposal_id),
+                LIFETIME_THRESHOLD,
+                BUMP_AMOUNT,
+            );
+        });
+
+    proposal
 }
 
 // -------------
@@ -186,24 +294,55 @@ pub fn save_proposal_signature(e: &Env, proposal_id: u64, signer: Address) {
         &DataKey::ProposalSignatures(proposal_id),
         &proposal_signatures,
     );
+    e.storage().persistent().extend_ttl(
+        &DataKey::ProposalSignatures(proposal_id),
+        LIFETIME_THRESHOLD,
+        BUMP_AMOUNT,
+    );
 }
 
 pub fn get_proposal_signatures(env: &Env, proposal_id: u64) -> Map<Address, ()> {
-    env.storage()
+    let proposal_signatures = env
+        .storage()
         .persistent()
         .get(&DataKey::ProposalSignatures(proposal_id))
-        .unwrap_or(map![&env])
+        .unwrap_or(map![&env]);
+
+    env.storage()
+        .persistent()
+        .has(&DataKey::ProposalSignatures(proposal_id))
+        .then(|| {
+            env.storage().persistent().extend_ttl(
+                &DataKey::ProposalSignatures(proposal_id),
+                LIFETIME_THRESHOLD,
+                BUMP_AMOUNT,
+            )
+        });
+
+    proposal_signatures
 }
 
 pub fn save_version(env: &Env, version: &u32) {
     env.storage().persistent().set(&DataKey::Version, version);
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::Version, LIFETIME_THRESHOLD, BUMP_AMOUNT);
 }
 
 pub fn get_version(env: &Env) -> u32 {
-    env.storage()
+    let version = env
+        .storage()
         .persistent()
         .get(&DataKey::Version)
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    env.storage().persistent().has(&DataKey::Version).then(|| {
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Version, LIFETIME_THRESHOLD, BUMP_AMOUNT)
+    });
+
+    version
 }
 
 pub fn increase_version(env: &Env) {

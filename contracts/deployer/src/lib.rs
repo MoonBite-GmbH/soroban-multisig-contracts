@@ -5,6 +5,11 @@ use soroban_sdk::{
     String, Symbol, Val, Vec,
 };
 
+// Values used to extend the TTL of storage
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const BUMP_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
+pub const LIFETIME_THRESHOLD: u32 = BUMP_AMOUNT - DAY_IN_LEDGERS;
+
 // Metadata that is added on to the WASM custom section
 contractmeta!(
     key = "Description",
@@ -73,26 +78,55 @@ pub enum DataKey {
 
 pub fn set_initialized(env: &Env) {
     env.storage().instance().set(&DataKey::IsInitialized, &());
+    env.storage()
+        .instance()
+        .extend_ttl(LIFETIME_THRESHOLD, BUMP_AMOUNT);
 }
 
 pub fn is_initialized(env: &Env) -> bool {
-    env.storage()
+    let is_initialized = env
+        .storage()
         .instance()
         .get::<_, ()>(&DataKey::IsInitialized)
-        .is_some()
+        .is_some();
+
+    env.storage()
+        .instance()
+        .has(&DataKey::IsInitialized)
+        .then(|| {
+            env.storage()
+                .instance()
+                .extend_ttl(LIFETIME_THRESHOLD, BUMP_AMOUNT)
+        });
+
+    is_initialized
 }
 
 pub fn set_wasm_hash(env: &Env, hash: &BytesN<32>) {
     env.storage()
         .instance()
         .set(&DataKey::MultisigWasmHash, hash);
+    env.storage()
+        .instance()
+        .extend_ttl(LIFETIME_THRESHOLD, BUMP_AMOUNT);
 }
 
 pub fn get_wasm_hash(env: &Env) -> BytesN<32> {
-    env.storage()
+    let wasm_hash = env
+        .storage()
         .instance()
         .get(&DataKey::MultisigWasmHash)
-        .unwrap()
+        .unwrap();
+    env.storage()
+        .instance()
+        .has(&DataKey::MultisigWasmHash)
+        .then(|| {
+            env.storage()
+                .instance()
+                .extend_ttl(LIFETIME_THRESHOLD, BUMP_AMOUNT)
+        });
+
+    wasm_hash
 }
 
 #[cfg(test)]
