@@ -438,6 +438,21 @@ impl Multisig {
 
         Ok(proposals)
     }
+
+    #[allow(dead_code)]
+    pub fn is_proposal_ready(env: Env, proposal_id: u64) -> Result<bool, ContractError> {
+        let multisig_len = get_multisig_members(&env).len();
+        let signed = get_proposal_signatures(&env, proposal_id).len();
+
+        let required_quorum = Decimal::bps(get_quorum_bps(&env) as i64);
+        let voted_ratio = Decimal::from_ratio(signed, multisig_len);
+
+        if voted_ratio >= required_quorum {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
 }
 
 fn verify_members(env: &Env, members: &Vec<Address>) {

@@ -272,3 +272,52 @@ fn create_and_execute_update_proposal_with_expiration_date() {
     let version_proposal = multisig.query_multisig_info().version_proposal;
     assert_eq!(version_proposal, 1);
 }
+
+#[test]
+fn query_proposal_readiness() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.budget().reset_unlimited();
+
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+    let member3 = Address::generate(&env);
+    let member4 = Address::generate(&env);
+    let members = vec![
+        &env,
+        member1.clone(),
+        member2.clone(),
+        member3.clone(),
+        member4.clone(),
+    ];
+
+    let multisig = initialize_multisig_contract(
+        &env,
+        String::from_str(&env, "MultisigName"),
+        String::from_str(&env, "Example description of this multisig"),
+        members.clone(),
+        // to pass this we need %100
+        Some(10_000u32),
+    );
+
+    let new_wasm_hash = utils::multisig_wasm_hash(&env);
+    multisig.create_update_proposal(&member1, &new_wasm_hash, &None);
+
+    let proposal_id = multisig.query_last_proposal_id();
+
+    // Initially, the proposal should not be ready
+    assert!(!multisig.is_proposal_ready(&proposal_id));
+
+    // Sign the proposal with two members, it should still not be ready
+    multisig.sign_proposal(&member1, &proposal_id);
+    multisig.sign_proposal(&member2, &proposal_id);
+    assert!(!multisig.is_proposal_ready(&proposal_id));
+
+    // Sign the proposal with one more member, it should still not be ready
+    multisig.sign_proposal(&member3, &proposal_id);
+    assert!(!multisig.is_proposal_ready(&proposal_id));
+
+    // Sign the proposal with the final member, it should now be ready
+    multisig.sign_proposal(&member4, &proposal_id);
+    assert!(multisig.is_proposal_ready(&proposal_id));
+}
