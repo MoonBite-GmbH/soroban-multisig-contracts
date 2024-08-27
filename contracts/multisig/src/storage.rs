@@ -169,17 +169,6 @@ pub fn get_proposal(env: &Env, proposal_id: u32) -> Option<Proposal> {
         .get(&DataKey::Proposal(proposal_id))
 }
 
-pub fn remove_proposal(env: &Env, proposal_id: u32) {
-    env.storage()
-        .persistent()
-        .remove(&DataKey::Proposal(proposal_id));
-
-    // remove existing signatures as well
-    env.storage()
-        .instance()
-        .remove(&DataKey::ProposalSignatures(proposal_id))
-}
-
 // -------------
 
 // When user signes the given proposal, save an information about it

@@ -125,59 +125,6 @@ fn propose_transaction_proposal_full_quorum() {
 }
 
 #[test]
-fn remove_proposal() {
-    let env = Env::default();
-    env.mock_all_auths();
-
-    let member1 = Address::generate(&env);
-    let members = vec![&env, member1.clone()];
-
-    let multisig = initialize_multisig_contract(
-        &env,
-        String::from_str(&env, "MultisigName"),
-        String::from_str(&env, "Example description of this multisig"),
-        members.clone(),
-        None,
-    );
-
-    let token = deploy_token_contract(&env, &member1);
-    let recipient = Address::generate(&env);
-
-    multisig.create_transaction_proposal(
-        &member1,
-        &String::from_str(&env, "TxTitle#01"),
-        &String::from_str(&env, "TxTestDescription"),
-        &recipient,
-        &10_000,
-        &token.address,
-        &None,
-    );
-
-    assert_eq!(
-        multisig.query_proposal(&1).unwrap(),
-        Proposal {
-            id: 1,
-            sender: member1.clone(),
-            proposal: ProposalType::Transaction(Transaction {
-                token: token.address.clone(),
-                amount: 10_000,
-                recipient: recipient.clone(),
-                title: String::from_str(&env, "TxTitle#01"),
-                description: String::from_str(&env, "TxTestDescription")
-            }),
-            status: ProposalStatus::Open,
-            creation_timestamp: 0,
-            expiration_timestamp: SEVEN_DAYS_EXPIRATION_DATE
-        }
-    );
-
-    // now remove this proposal
-    multisig.remove_proposal(&member1, &1);
-
-    assert!(multisig.query_proposal(&1).is_none());
-}
-
-#[test]
 #[should_panic = "Multisig: Create transaction proposal: Title longer than 64 characters!"]
 fn proposal_name_too_long() {
     let env = Env::default();
@@ -271,51 +218,7 @@ fn sign_invalid_proposal() {
 }
 
 #[test]
-#[should_panic(expected = "Multisig: Sign proposal: Proposal with this ID does not exist!")]
-fn sign_removed_proposal() {
-    let env = Env::default();
-    env.mock_all_auths();
-
-    let member1 = Address::generate(&env);
-    let member2 = Address::generate(&env);
-    let members = vec![&env, member1.clone(), member2.clone()];
-
-    let multisig = initialize_multisig_contract(
-        &env,
-        String::from_str(&env, "MultisigName"),
-        String::from_str(&env, "Example description of this multisig"),
-        members.clone(),
-        None,
-    );
-
-    // create some token for the transaction
-    let token = deploy_token_contract(&env, &member1);
-    token.mint(&multisig.address, &10_000);
-
-    let recipient = Address::generate(&env);
-
-    multisig.create_transaction_proposal(
-        &member1,
-        &String::from_str(&env, "TxTitle#01"),
-        &String::from_str(&env, "TxTestDescription"),
-        &recipient,
-        &10_000,
-        &token.address,
-        &None,
-    );
-
-    // First member is able to vote for this proposal
-    multisig.sign_proposal(&member1, &1);
-
-    // then member1 removes the proposal
-    multisig.remove_proposal(&member1, &1);
-
-    // This proposal can not be signed anymore
-    multisig.sign_proposal(&member2, &1);
-}
-
-#[test]
-fn query_all_proposals_with_one_removed() {
+fn query_all_proposals() {
     let env = Env::default();
     env.mock_all_auths();
 
@@ -365,15 +268,16 @@ fn query_all_proposals_with_one_removed() {
     );
     assert_eq!(multisig.query_last_proposal_id(), 3);
 
-    // we get rid of the 2nd proposal
-    multisig.remove_proposal(&member1, &2);
-
     // getting all proposals now
     let all_proposals_vec = multisig.query_all_proposals();
     let proposal1 = multisig.query_proposal(&1).unwrap();
+    let proposal2 = multisig.query_proposal(&2).unwrap();
     let proposal3 = multisig.query_proposal(&3).unwrap();
 
-    assert_eq!(all_proposals_vec, vec![&env, proposal1, proposal3]);
+    assert_eq!(
+        all_proposals_vec,
+        vec![&env, proposal1, proposal2, proposal3]
+    );
 }
 
 mod non_member {
@@ -476,39 +380,6 @@ mod non_member {
         multisig.sign_proposal(&member1, &1);
 
         multisig.execute_proposal(&random, &1);
-    }
-
-    #[test]
-    #[should_panic = "Multisig: Remove proposal: Sender is not a member of this multisig!"]
-    fn tries_to_remove() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let member1 = Address::generate(&env);
-        let random = Address::generate(&env);
-        let members = vec![&env, member1.clone()];
-
-        let multisig = initialize_multisig_contract(
-            &env,
-            String::from_str(&env, "MultisigName"),
-            String::from_str(&env, "Example description of this multisig"),
-            members.clone(),
-            None,
-        );
-
-        let recipient = Address::generate(&env);
-
-        multisig.create_transaction_proposal(
-            &member1,
-            &String::from_str(&env, "TxTitle#01"),
-            &String::from_str(&env, "TxTestDescription"),
-            &recipient,
-            &10_000,
-            &deploy_token_contract(&env, &member1).address,
-            &None,
-        );
-
-        multisig.remove_proposal(&random, &1);
     }
 }
 

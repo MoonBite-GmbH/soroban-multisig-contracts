@@ -8,9 +8,9 @@ use crate::{
     storage::{
         get_last_proposal_id, get_multisig_members, get_name, get_proposal,
         get_proposal_signatures, get_quorum_bps, get_version, increase_version,
-        increment_last_proposal_id, is_initialized, remove_proposal, save_new_multisig,
-        save_proposal, save_proposal_signature, save_quorum_bps, save_version, set_initialized,
-        set_name, MultisigInfo, Proposal, ProposalStatus, ProposalType, Transaction,
+        increment_last_proposal_id, is_initialized, save_new_multisig, save_proposal,
+        save_proposal_signature, save_quorum_bps, save_version, set_initialized, set_name,
+        MultisigInfo, Proposal, ProposalStatus, ProposalType, Transaction,
     },
     token_contract, ONE_HOUR, SEVEN_DAYS_EXPIRATION_DATE,
 };
@@ -345,31 +345,6 @@ impl Multisig {
             .publish(("Multisig", "Execute proposal ID: "), proposal_id);
         env.events()
             .publish(("Multisig", "Execute proposal sender"), sender);
-    }
-
-    // any member of the multisig can remove any proposal (it doesn't have to be closed/executed)
-    // we log that event
-    #[allow(dead_code)]
-    pub fn remove_proposal(env: Env, sender: Address, proposal_id: u32) {
-        sender.require_auth();
-
-        let multisig = get_multisig_members(&env);
-
-        // check if sender is a member of this multisig
-        if multisig.get(sender.clone()).is_none() {
-            log!(
-                &env,
-                "Multisig: Remove proposal: Sender is not a member of this multisig!"
-            );
-            panic_with_error!(&env, ContractError::UnauthorizedNotAMember);
-        }
-
-        remove_proposal(&env, proposal_id);
-
-        env.events()
-            .publish(("Multisig", "Remove proposal ID: "), proposal_id);
-        env.events()
-            .publish(("Multisig", "Remove proposal sender"), sender);
     }
 
     // ----------- QUERY
