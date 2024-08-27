@@ -1,9 +1,14 @@
+extern crate std;
+
 use soroban_sdk::{
-    testutils::{Address as _, Ledger},
-    vec, Address, Env, String,
+    testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger},
+    vec, Address, Env, IntoVal, String, Symbol,
 };
 
-use crate::tests::setup::{DAY_AS_TIMESTAMP, TWO_WEEKS_EXPIRATION_DATE};
+use crate::{
+    error::ContractError,
+    tests::setup::{DAY_AS_TIMESTAMP, TWO_WEEKS_EXPIRATION_DATE},
+};
 
 use super::setup::initialize_multisig_contract;
 
@@ -44,25 +49,129 @@ fn update_proposal_works() {
     // it's not actually a new wasm hash, but we need to use it to test the update proposal
     let new_wasm_hash = utils::multisig_wasm_hash(&env);
     multisig.create_update_proposal(&member1, &new_wasm_hash, &None);
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member1.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "create_update_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (&member1.clone(), new_wasm_hash, None::<u64>).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
 
     let proposal_id = multisig.query_last_proposal_id();
     multisig.sign_proposal(&member1, &proposal_id);
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member1.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "sign_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (&member1.clone(), proposal_id).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
+
     multisig.sign_proposal(&member2, &proposal_id);
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member2.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "sign_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (&member2.clone(), proposal_id).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
+
     multisig.sign_proposal(&member3, &proposal_id);
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member3.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "sign_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (&member3.clone(), proposal_id).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
 
     let version_proposal = multisig.query_multisig_info().version_proposal;
     assert_eq!(version_proposal, 0);
 
     multisig.execute_proposal(&member1, &proposal_id);
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member1.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "execute_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (&member1.clone(), proposal_id).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
 
     let version_proposal = multisig.query_multisig_info().version_proposal;
     assert_eq!(version_proposal, 1);
 }
 
 #[test]
-#[should_panic(
-    expected = "Multisig: Create update proposal: Sender is not a member of this multisig!"
-)]
 fn update_proposal_should_panic_when_sender_not_a_member() {
     let env = Env::default();
     env.mock_all_auths();
@@ -83,13 +192,13 @@ fn update_proposal_should_panic_when_sender_not_a_member() {
     );
 
     let new_wasm_hash = utils::multisig_wasm_hash(&env);
-    multisig.create_update_proposal(&not_a_member, &new_wasm_hash, &None);
+    assert_eq!(
+        multisig.try_create_update_proposal(&not_a_member, &new_wasm_hash, &None),
+        Err(Ok(ContractError::UnauthorizedNotAMember))
+    );
 }
 
 #[test]
-#[should_panic(
-    expected = "Multisig: Create Update proposal: Expiration date cannot be less than an hour."
-)]
 fn create_update_proposal_should_fail_when_invalid_expiration_date() {
     let env = Env::default();
     env.mock_all_auths();
@@ -110,8 +219,12 @@ fn create_update_proposal_should_fail_when_invalid_expiration_date() {
 
     let new_wasm_hash = utils::multisig_wasm_hash(&env);
     // 1 second less than an hour
-    multisig.create_update_proposal(&member1, &new_wasm_hash, &Some(3_599));
+    assert_eq!(
+        multisig.try_create_update_proposal(&member1, &new_wasm_hash, &Some(3_599)),
+        Err(Ok(ContractError::InvalidExpirationDate))
+    );
 }
+
 #[test]
 fn create_and_execute_update_proposal_with_expiration_date() {
     let env = Env::default();

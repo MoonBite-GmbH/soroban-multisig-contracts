@@ -1,7 +1,11 @@
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
 
 use super::setup::initialize_multisig_contract;
-use crate::storage::MultisigInfo;
+use crate::{
+    contract::{Multisig, MultisigClient},
+    error::ContractError,
+    storage::MultisigInfo,
+};
 
 #[test]
 fn initialize_multisig() {
@@ -61,7 +65,6 @@ fn initialize_multisig_with_custom_quorum() {
 }
 
 #[test]
-#[should_panic = "Multisig: Initialize: initializing contract twice is not allowed"]
 fn double_initialize_is_forbidden() {
     let env = Env::default();
     env.mock_all_auths();
@@ -77,16 +80,18 @@ fn double_initialize_is_forbidden() {
         None,
     );
 
-    multisig.initialize(
-        &String::from_str(&env, "MultisigName"),
-        &String::from_str(&env, "Example description of this multisig"),
-        &members.clone(),
-        &None,
-    )
+    assert_eq!(
+        multisig.try_initialize(
+            &String::from_str(&env, "MultisigName"),
+            &String::from_str(&env, "Example description of this multisig"),
+            &members.clone(),
+            &None,
+        ),
+        Err(Ok(ContractError::AlreadyInitialized)),
+    );
 }
 
 #[test]
-#[should_panic = "Multisig: Initialize: Name longer than 64 characters!"]
 fn initialize_name_too_long() {
     let env = Env::default();
     env.mock_all_auths();
@@ -94,17 +99,19 @@ fn initialize_name_too_long() {
     let member1 = Address::generate(&env);
     let members = vec![&env, member1.clone()];
 
-    initialize_multisig_contract(
-        &env,
-        String::from_bytes(&env, &[0u8; 65]),
-        String::from_str(&env, "Example description of this multisig"),
-        members.clone(),
-        None,
+    let multisig = MultisigClient::new(&env, &env.register_contract(None, Multisig {}));
+    assert_eq!(
+        multisig.try_initialize(
+            &String::from_bytes(&env, &[0u8; 65]),
+            &String::from_str(&env, "Example description of this multisig"),
+            &members.clone(),
+            &None,
+        ),
+        Err(Ok(ContractError::TitleTooLong))
     );
 }
 
 #[test]
-#[should_panic = "Multisig: Initialize: Description longer than 256 characters!"]
 fn initialize_description_too_long() {
     let env = Env::default();
     env.mock_all_auths();
@@ -112,17 +119,19 @@ fn initialize_description_too_long() {
     let member1 = Address::generate(&env);
     let members = vec![&env, member1.clone()];
 
-    initialize_multisig_contract(
-        &env,
-        String::from_str(&env, "MultisigName"),
-        String::from_bytes(&env, &[0u8; 257]),
-        members.clone(),
-        None,
+    let multisig = MultisigClient::new(&env, &env.register_contract(None, Multisig {}));
+    assert_eq!(
+        multisig.try_initialize(
+            &String::from_str(&env, "MultisigName"),
+            &String::from_bytes(&env, &[0u8; 257]),
+            &members.clone(),
+            &None,
+        ),
+        Err(Ok(ContractError::DescriptionTooLong))
     );
 }
 
 #[test]
-#[should_panic = "Multisig: Initialize: Quorum BPS amount set to 100 or lower"]
 fn initialize_bps_too_small() {
     let env = Env::default();
     env.mock_all_auths();
@@ -130,17 +139,19 @@ fn initialize_bps_too_small() {
     let member1 = Address::generate(&env);
     let members = vec![&env, member1.clone()];
 
-    initialize_multisig_contract(
-        &env,
-        String::from_str(&env, "MultisigName"),
-        String::from_str(&env, "Description"),
-        members.clone(),
-        100u32,
+    let multisig = MultisigClient::new(&env, &env.register_contract(None, Multisig {}));
+    assert_eq!(
+        multisig.try_initialize(
+            &String::from_str(&env, "MultisigName"),
+            &String::from_str(&env, "Description"),
+            &members.clone(),
+            &Some(100u32),
+        ),
+        Err(Ok(ContractError::InitializeTooLowQuorum))
     );
 }
 
 #[test]
-#[should_panic = "Multisig: Initialize: Quorum BPS amount set to more than 100%!"]
 fn initialize_bps_too_big() {
     let env = Env::default();
     env.mock_all_auths();
@@ -148,11 +159,14 @@ fn initialize_bps_too_big() {
     let member1 = Address::generate(&env);
     let members = vec![&env, member1.clone()];
 
-    initialize_multisig_contract(
-        &env,
-        String::from_str(&env, "MultisigName"),
-        String::from_str(&env, "Description"),
-        members.clone(),
-        10_001u32,
+    let multisig = MultisigClient::new(&env, &env.register_contract(None, Multisig {}));
+    assert_eq!(
+        multisig.try_initialize(
+            &String::from_str(&env, "MultisigName"),
+            &String::from_str(&env, "Description"),
+            &members.clone(),
+            &Some(10_001u32),
+        ),
+        Err(Ok(ContractError::InitializeTooHighQuorum))
     );
 }

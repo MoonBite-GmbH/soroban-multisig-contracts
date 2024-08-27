@@ -1,6 +1,8 @@
+extern crate std;
+
 use soroban_sdk::{
-    testutils::{Address as _, Ledger},
-    vec, Address, Env, String,
+    testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger},
+    vec, Address, Env, IntoVal, String, Symbol,
 };
 
 use super::setup::{
@@ -8,6 +10,7 @@ use super::setup::{
     TWO_WEEKS_EXPIRATION_DATE,
 };
 use crate::{
+    error::ContractError,
     storage::{Proposal, ProposalStatus, ProposalType, Transaction},
     SEVEN_DAYS_EXPIRATION_DATE,
 };
@@ -45,10 +48,41 @@ fn propose_transaction_proposal_full_quorum() {
         &token.address,
         &None,
     );
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member1.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "create_transaction_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (
+                        &member1.clone(),
+                        "TxTitle#01",
+                        "TxTestDescription",
+                        &recipient,
+                        10_000u64,
+                        &token.address,
+                        None::<u64>,
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
+
     assert_eq!(multisig.query_last_proposal_id(), 1);
 
     assert_eq!(
-        multisig.query_proposal(&1).unwrap(),
+        multisig.query_proposal(&1),
         Proposal {
             id: 1,
             sender: member1.clone(),
@@ -118,14 +152,10 @@ fn propose_transaction_proposal_full_quorum() {
     assert_eq!(token.balance(&recipient), 10_000i128);
     assert_eq!(token.balance(&multisig.address), 0i128);
 
-    assert_eq!(
-        multisig.query_proposal(&1).unwrap().status,
-        ProposalStatus::Closed
-    );
+    assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
 }
 
 #[test]
-#[should_panic = "Multisig: Create transaction proposal: Title longer than 64 characters!"]
 fn proposal_name_too_long() {
     let env = Env::default();
     env.mock_all_auths();
@@ -141,19 +171,21 @@ fn proposal_name_too_long() {
         None,
     );
 
-    multisig.create_transaction_proposal(
-        &member1,
-        &String::from_bytes(&env, &[0u8; 65]),
-        &String::from_str(&env, "TxTestDescription"),
-        &Address::generate(&env),
-        &10_000,
-        &deploy_token_contract(&env, &member1).address,
-        &None,
+    assert_eq!(
+        multisig.try_create_transaction_proposal(
+            &member1,
+            &String::from_bytes(&env, &[0u8; 65]),
+            &String::from_str(&env, "TxTestDescription"),
+            &Address::generate(&env),
+            &10_000,
+            &deploy_token_contract(&env, &member1).address,
+            &None,
+        ),
+        Err(Ok(ContractError::TitleTooLong))
     );
 }
 
 #[test]
-#[should_panic = "Multisig: Create transaction proposal: Description longer than 256 characters!"]
 fn proposal_description_too_long() {
     let env = Env::default();
     env.mock_all_auths();
@@ -169,19 +201,21 @@ fn proposal_description_too_long() {
         None,
     );
 
-    multisig.create_transaction_proposal(
-        &member1,
-        &String::from_str(&env, "TxTitle#01"),
-        &String::from_bytes(&env, &[0u8; 257]),
-        &Address::generate(&env),
-        &10_000,
-        &deploy_token_contract(&env, &member1).address,
-        &None,
+    assert_eq!(
+        multisig.try_create_transaction_proposal(
+            &member1,
+            &String::from_str(&env, "TxTitle#01"),
+            &String::from_bytes(&env, &[0u8; 258]),
+            &Address::generate(&env),
+            &10_000,
+            &deploy_token_contract(&env, &member1).address,
+            &None,
+        ),
+        Err(Ok(ContractError::DescriptionTooLong))
     );
 }
 
 #[test]
-#[should_panic(expected = "Multisig: Sign proposal: Proposal with this ID does not exist!")]
 fn sign_invalid_proposal() {
     let env = Env::default();
     env.mock_all_auths();
@@ -214,7 +248,10 @@ fn sign_invalid_proposal() {
     );
 
     // only proposal with ID 1 exists now
-    multisig.sign_proposal(&member1, &2);
+    assert_eq!(
+        multisig.try_sign_proposal(&member1, &2),
+        Err(Ok(ContractError::ProposalNotFound))
+    );
 }
 
 #[test]
@@ -248,6 +285,38 @@ fn query_all_proposals() {
         &token.address,
         &None,
     );
+
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member1.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "create_transaction_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (
+                        &member1.clone(),
+                        "TxTitle#01",
+                        "TxTestDescription",
+                        &recipient1,
+                        10_000u64,
+                        &token.address,
+                        None::<u64>,
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
+
     multisig.create_transaction_proposal(
         &member1,
         &String::from_str(&env, "TxTitle#02"),
@@ -257,6 +326,38 @@ fn query_all_proposals() {
         &token.address,
         &None,
     );
+
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member1.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "create_transaction_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (
+                        &member1.clone(),
+                        "TxTitle#02",
+                        "TxTestDescription",
+                        &recipient2,
+                        15_000u64,
+                        &token.address,
+                        None::<u64>,
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
+
     multisig.create_transaction_proposal(
         &member1,
         &String::from_str(&env, "TxTitle#03"),
@@ -266,13 +367,45 @@ fn query_all_proposals() {
         &token.address,
         &None,
     );
+
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            // Address for which authorization check is performed
+            member1.clone(),
+            // Invocation tree that needs to be authorized
+            AuthorizedInvocation {
+                // Function that is authorized. Can be a contract function or
+                // a host function that requires authorization.
+                function: AuthorizedFunction::Contract((
+                    // Address of the called contract
+                    multisig.address.clone(),
+                    // Name of the called function
+                    Symbol::new(&env, "create_transaction_proposal"),
+                    // Arguments used to call `create_transaction_proposal`
+                    (
+                        &member1.clone(),
+                        "TxTitle#03",
+                        "TxTestDescription",
+                        &recipient1,
+                        5_000u64,
+                        &token.address,
+                        None::<u64>,
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )]
+    );
+
     assert_eq!(multisig.query_last_proposal_id(), 3);
 
     // getting all proposals now
     let all_proposals_vec = multisig.query_all_proposals();
-    let proposal1 = multisig.query_proposal(&1).unwrap();
-    let proposal2 = multisig.query_proposal(&2).unwrap();
-    let proposal3 = multisig.query_proposal(&3).unwrap();
+    let proposal1 = multisig.query_proposal(&1);
+    let proposal2 = multisig.query_proposal(&2);
+    let proposal3 = multisig.query_proposal(&3);
 
     assert_eq!(
         all_proposals_vec,
@@ -284,7 +417,6 @@ mod non_member {
     use super::*;
 
     #[test]
-    #[should_panic = "Multisig: Create transaction proposal: Sender is not a member of this multisig!"]
     fn tries_to_create_proposal() {
         let env = Env::default();
         env.mock_all_auths();
@@ -303,19 +435,21 @@ mod non_member {
 
         let recipient = Address::generate(&env);
 
-        multisig.create_transaction_proposal(
-            &random,
-            &String::from_str(&env, "TxTitle#01"),
-            &String::from_str(&env, "TxTestDescription"),
-            &recipient,
-            &10_000,
-            &deploy_token_contract(&env, &member1).address,
-            &None,
-        );
+        assert_eq!(
+            multisig.try_create_transaction_proposal(
+                &random,
+                &String::from_str(&env, "TxTitle#01"),
+                &String::from_str(&env, "TxTestDescription"),
+                &recipient,
+                &10_000,
+                &deploy_token_contract(&env, &member1).address,
+                &None
+            ),
+            Err(Ok(ContractError::UnauthorizedNotAMember))
+        )
     }
 
     #[test]
-    #[should_panic = "Multisig: Sign proposal: Sender is not a member of this multisig!"]
     fn tries_to_vote() {
         let env = Env::default();
         env.mock_all_auths();
@@ -323,6 +457,7 @@ mod non_member {
         let member1 = Address::generate(&env);
         let random = Address::generate(&env);
         let members = vec![&env, member1.clone()];
+        let token_address = deploy_token_contract(&env, &member1).address;
 
         let multisig = initialize_multisig_contract(
             &env,
@@ -340,15 +475,48 @@ mod non_member {
             &String::from_str(&env, "TxTestDescription"),
             &recipient,
             &10_000,
-            &deploy_token_contract(&env, &member1).address,
+            &token_address,
             &None,
         );
 
-        multisig.sign_proposal(&random, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "create_transaction_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (
+                            &member1.clone(),
+                            "TxTitle#01",
+                            "TxTestDescription",
+                            &recipient,
+                            10_000u64,
+                            &token_address,
+                            None::<u64>,
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
+        assert_eq!(
+            multisig.try_sign_proposal(&random, &1),
+            Err(Ok(ContractError::UnauthorizedNotAMember))
+        );
     }
 
     #[test]
-    #[should_panic = "Multisig: Execute proposal: Sender is not a member of this multisig!"]
     fn tries_to_execute() {
         let env = Env::default();
         env.mock_all_auths();
@@ -379,7 +547,10 @@ mod non_member {
 
         multisig.sign_proposal(&member1, &1);
 
-        multisig.execute_proposal(&random, &1);
+        assert_eq!(
+            multisig.try_execute_proposal(&random, &1),
+            Err(Ok(ContractError::UnauthorizedNotAMember))
+        );
     }
 }
 
@@ -387,7 +558,6 @@ mod closed_proposal {
     use super::*;
 
     #[test]
-    #[should_panic = "Multisig: Sign proposal: Trying to sign a closed proposal!"]
     fn member_cant_vote() {
         let env = Env::default();
         env.mock_all_auths();
@@ -427,15 +597,14 @@ mod closed_proposal {
         multisig.execute_proposal(&member1, &1);
 
         // now 3rd member can't vote closed proposal
+        assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
         assert_eq!(
-            multisig.query_proposal(&1).unwrap().status,
-            ProposalStatus::Closed
+            multisig.try_sign_proposal(&member3, &1),
+            Err(Ok(ContractError::ProposalClosed))
         );
-        multisig.sign_proposal(&member3, &1);
     }
 
     #[test]
-    #[should_panic = "Multisig: Execute proposal: Trying to execute a closed proposal!"]
     fn member_cant_execute() {
         let env = Env::default();
         env.mock_all_auths();
@@ -474,11 +643,11 @@ mod closed_proposal {
         multisig.execute_proposal(&member1, &1);
 
         // now 1rd member can't vote closed proposal
+        assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
         assert_eq!(
-            multisig.query_proposal(&1).unwrap().status,
-            ProposalStatus::Closed
+            multisig.try_execute_proposal(&member1, &1),
+            Err(Ok(ContractError::ProposalClosed))
         );
-        multisig.execute_proposal(&member1, &1);
     }
 }
 
@@ -518,9 +687,61 @@ mod quorum {
             &token.address,
             &None,
         );
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "create_transaction_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (
+                            &member1.clone(),
+                            "TxTitle#01",
+                            "TxTestDescription",
+                            &recipient,
+                            10_000u64,
+                            &token.address,
+                            None::<u64>
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
 
         // One signature gives bigger ratio then threshold required
         multisig.sign_proposal(&member1, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member1.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         assert_eq!(
             multisig.query_signatures(&1),
             vec![
@@ -532,14 +753,32 @@ mod quorum {
         );
 
         multisig.execute_proposal(&member1, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "execute_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member1.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
 
         assert_eq!(token.balance(&recipient), 10_000i128);
         assert_eq!(token.balance(&multisig.address), 0i128);
 
-        assert_eq!(
-            multisig.query_proposal(&1).unwrap().status,
-            ProposalStatus::Closed
-        );
+        assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
     }
 
     #[test]
@@ -575,9 +814,61 @@ mod quorum {
             &token.address,
             &None,
         );
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "create_transaction_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (
+                            &member1.clone(),
+                            "TxTitle#01",
+                            "TxTestDescription",
+                            &recipient,
+                            10_000u64,
+                            &token.address,
+                            None::<u64>
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
 
         // One signature gives ratio equal to the quorum
         multisig.sign_proposal(&member1, &1);
+
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member1.clone(), 1u64,).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
         assert_eq!(
             multisig.query_signatures(&1),
             vec![
@@ -589,18 +880,35 @@ mod quorum {
         );
 
         multisig.execute_proposal(&member1, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "execute_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member1.clone(), 1u64,).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
 
         assert_eq!(token.balance(&recipient), 10_000i128);
         assert_eq!(token.balance(&multisig.address), 0i128);
 
-        assert_eq!(
-            multisig.query_proposal(&1).unwrap().status,
-            ProposalStatus::Closed
-        );
+        assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
     }
 
     #[test]
-    #[should_panic = "Multisig: Execute proposal: Required quorum has not been reached!"]
     fn higher_than_one_signature_fails_to_execute() {
         let env = Env::default();
         env.mock_all_auths();
@@ -633,9 +941,60 @@ mod quorum {
             &token.address,
             &None,
         );
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "create_transaction_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (
+                            &member1.clone(),
+                            "TxTitle#01",
+                            "TxTestDescription",
+                            &recipient,
+                            10_000u64,
+                            &token.address,
+                            None::<u64>
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
 
         // One signature is not enough and execution will fail
         multisig.sign_proposal(&member1, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member1.clone(), 1u64,).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
         assert_eq!(
             multisig.query_signatures(&1),
             vec![
@@ -646,11 +1005,13 @@ mod quorum {
             ]
         );
 
-        multisig.execute_proposal(&member1, &1);
+        assert_eq!(
+            multisig.try_execute_proposal(&member1, &1),
+            Err(Ok(ContractError::QuorumNotReached))
+        );
     }
 
     #[test]
-    #[should_panic = "Multisig: Execute proposal: Required quorum has not been reached!"]
     fn nine_out_of_ten_signatures_full_quorum() {
         let env = Env::default();
         env.mock_all_auths();
@@ -702,17 +1063,245 @@ mod quorum {
             &token.address,
             &None,
         );
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "create_transaction_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (
+                            &member1.clone(),
+                            "TxTitle#01",
+                            "TxTestDescription",
+                            &recipient,
+                            10_000u64,
+                            &token.address,
+                            None::<u64>
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
 
         // One signature is not enough and execution will fail
         multisig.sign_proposal(&member1, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member1.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member1.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member2, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member2.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member2.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member3, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member3.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member3.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member4, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member4.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member4.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member5, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member5.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member5.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member6, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member6.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member6.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member7, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member7.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member7.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member8, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member8.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member8.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         multisig.sign_proposal(&member0, &1);
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                // Address for which authorization check is performed
+                member0.clone(),
+                // Invocation tree that needs to be authorized
+                AuthorizedInvocation {
+                    // Function that is authorized. Can be a contract function or
+                    // a host function that requires authorization.
+                    function: AuthorizedFunction::Contract((
+                        // Address of the called contract
+                        multisig.address.clone(),
+                        // Name of the called function
+                        Symbol::new(&env, "sign_proposal"),
+                        // Arguments used to call `create_transaction_proposal`
+                        (&member0.clone(), 1u64).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![]
+                }
+            )]
+        );
+
         assert_eq!(
             multisig.query_signatures(&1),
             vec![
@@ -730,7 +1319,10 @@ mod quorum {
             ]
         );
 
-        multisig.execute_proposal(&member1, &1);
+        assert_eq!(
+            multisig.try_execute_proposal(&member1, &1),
+            Err(Ok(ContractError::QuorumNotReached))
+        );
     }
 
     #[test]
@@ -822,10 +1414,7 @@ mod quorum {
         assert_eq!(token.balance(&recipient), 10_000i128);
         assert_eq!(token.balance(&multisig.address), 0i128);
 
-        assert_eq!(
-            multisig.query_proposal(&1).unwrap().status,
-            ProposalStatus::Closed
-        );
+        assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
     }
 }
 
@@ -886,7 +1475,7 @@ fn multiple_active_proposals() {
     assert_eq!(multisig.query_last_proposal_id(), 3);
 
     assert_eq!(
-        multisig.query_proposal(&1).unwrap(),
+        multisig.query_proposal(&1),
         Proposal {
             id: 1,
             sender: member1.clone(),
@@ -903,7 +1492,7 @@ fn multiple_active_proposals() {
         }
     );
     assert_eq!(
-        multisig.query_proposal(&2).unwrap(),
+        multisig.query_proposal(&2),
         Proposal {
             id: 2,
             sender: member3.clone(),
@@ -920,7 +1509,7 @@ fn multiple_active_proposals() {
         }
     );
     assert_eq!(
-        multisig.query_proposal(&3).unwrap(),
+        multisig.query_proposal(&3),
         Proposal {
             id: 3,
             sender: member2.clone(),
@@ -939,9 +1528,9 @@ fn multiple_active_proposals() {
 
     // get all proposals
     let all_proposals_vec = multisig.query_all_proposals();
-    let proposal1 = multisig.query_proposal(&1).unwrap();
-    let proposal2 = multisig.query_proposal(&2).unwrap();
-    let proposal3 = multisig.query_proposal(&3).unwrap();
+    let proposal1 = multisig.query_proposal(&1);
+    let proposal2 = multisig.query_proposal(&2);
+    let proposal3 = multisig.query_proposal(&3);
 
     assert_eq!(
         all_proposals_vec,
@@ -998,34 +1587,24 @@ fn multiple_active_proposals() {
     multisig.execute_proposal(&member1, &3);
     assert_eq!(token2.balance(&recipient1), 5_000i128);
     assert_eq!(token2.balance(&multisig.address), 0i128);
-    assert_eq!(
-        multisig.query_proposal(&3).unwrap().status,
-        ProposalStatus::Closed
-    );
+    assert_eq!(multisig.query_proposal(&3).status, ProposalStatus::Closed);
 
     assert_eq!(token.balance(&recipient2), 0i128);
     assert_eq!(token.balance(&multisig.address), 25_000i128);
     multisig.execute_proposal(&member1, &2);
     assert_eq!(token.balance(&recipient2), 15_000i128);
     assert_eq!(token.balance(&multisig.address), 10_000i128);
-    assert_eq!(
-        multisig.query_proposal(&2).unwrap().status,
-        ProposalStatus::Closed
-    );
+    assert_eq!(multisig.query_proposal(&2).status, ProposalStatus::Closed);
 
     assert_eq!(token.balance(&recipient1), 0i128);
     assert_eq!(token.balance(&multisig.address), 10_000i128);
     multisig.execute_proposal(&member1, &1);
     assert_eq!(token.balance(&recipient1), 10_000i128);
     assert_eq!(token.balance(&multisig.address), 0i128);
-    assert_eq!(
-        multisig.query_proposal(&1).unwrap().status,
-        ProposalStatus::Closed
-    );
+    assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
 }
 
 #[test]
-#[should_panic(expected = "Multisig: Execute proposal: Trying to execute an expired proposal!")]
 fn execute_proposal_should_fail_when_after_expiration_date() {
     let env = Env::default();
     env.mock_all_auths();
@@ -1065,13 +1644,13 @@ fn execute_proposal_should_fail_when_after_expiration_date() {
     env.ledger()
         .with_mut(|li| li.timestamp = TWO_WEEKS_EXPIRATION_DATE);
 
-    multisig.execute_proposal(&member1, &1);
+    assert_eq!(
+        multisig.try_execute_proposal(&member1, &1),
+        Err(Ok(ContractError::ProposalExpired))
+    );
 }
 
 #[test]
-#[should_panic(
-    expected = "Multisig: Create Transaction proposal: Expiration date cannot be less than an hour."
-)]
 fn create_transaction_proposal_should_fail_with_invalid_expiration_date() {
     let env = Env::default();
     env.mock_all_auths();
@@ -1095,15 +1674,18 @@ fn create_transaction_proposal_should_fail_with_invalid_expiration_date() {
 
     let recipient = Address::generate(&env);
 
-    multisig.create_transaction_proposal(
-        &member1,
-        &String::from_str(&env, "TxTitle#01"),
-        &String::from_str(&env, "TxTestDescription"),
-        &recipient,
-        &10_000,
-        &token.address,
-        // minimum expiration date is an hour after creation, we set one that is 1 second shorter than that.
-        &Some(3_599),
+    assert_eq!(
+        multisig.try_create_transaction_proposal(
+            &member1,
+            &String::from_str(&env, "TxTitle#01"),
+            &String::from_str(&env, "TxTestDescription"),
+            &recipient,
+            &10_000,
+            &token.address,
+            // minimum expiration date is an hour after creation, we set one that is 1 second shorter than that.
+            &Some(3_599),
+        ),
+        Err(Ok(ContractError::InvalidExpirationDate))
     );
 }
 
@@ -1144,7 +1726,7 @@ fn create_and_execute_transaction_proposal_within_deadline() {
     assert_eq!(multisig.query_last_proposal_id(), 1);
 
     assert_eq!(
-        multisig.query_proposal(&1).unwrap(),
+        multisig.query_proposal(&1),
         Proposal {
             id: 1,
             sender: member1.clone(),
@@ -1186,8 +1768,5 @@ fn create_and_execute_transaction_proposal_within_deadline() {
     assert_eq!(token.balance(&recipient), 10_000i128);
     assert_eq!(token.balance(&multisig.address), 0i128);
 
-    assert_eq!(
-        multisig.query_proposal(&1).unwrap().status,
-        ProposalStatus::Closed
-    );
+    assert_eq!(multisig.query_proposal(&1).status, ProposalStatus::Closed);
 }

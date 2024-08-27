@@ -35,7 +35,7 @@ impl Multisig {
         description: String,
         members: Vec<Address>,
         quorum_bps: Option<u32>,
-    ) {
+    ) -> Result<(), ContractError> {
         verify_members(&env, &members);
 
         if is_initialized(&env) {
@@ -43,7 +43,7 @@ impl Multisig {
                 &env,
                 "Multisig: Initialize: initializing contract twice is not allowed"
             );
-            panic_with_error!(&env, ContractError::AlreadyInitialized);
+            return Err(ContractError::AlreadyInitialized);
         }
         set_initialized(&env);
 
@@ -56,14 +56,14 @@ impl Multisig {
                 &env,
                 "Multisig: Initialize: Name longer than 64 characters!"
             );
-            panic_with_error!(&env, ContractError::TitleTooLong);
+            return Err(ContractError::TitleTooLong);
         }
         if description.len() > 256 {
             log!(
                 &env,
                 "Multisig: Initialize: Description longer than 256 characters!"
             );
-            panic_with_error!(&env, ContractError::DescriptionTooLong);
+            return Err(ContractError::DescriptionTooLong);
         }
         set_name(&env, name.clone(), description.clone());
 
@@ -73,13 +73,13 @@ impl Multisig {
                 &env,
                 "Multisig: Initialize: Quorum BPS amount set to 100 or lower"
             );
-            panic_with_error!(&env, ContractError::InitializeTooLowQuorum);
+            return Err(ContractError::InitializeTooLowQuorum);
         } else if quorum_bps > 10_000 {
             log!(
                 &env,
                 "Multisig: Initialize: Quorum BPS amount set to more than 100%!"
             );
-            panic_with_error!(&env, ContractError::InitializeTooHighQuorum);
+            return Err(ContractError::InitializeTooHighQuorum);
         } else {
             save_quorum_bps(&env, quorum_bps);
         }
@@ -89,6 +89,8 @@ impl Multisig {
         env.events().publish(("Multisig", "Initialize name"), name);
         env.events()
             .publish(("Multisig", "Initialize description"), description);
+
+        Ok(())
     }
 
     #[allow(dead_code, clippy::too_many_arguments)]
@@ -101,7 +103,7 @@ impl Multisig {
         amount: u64,
         token: Address,
         expiration_date: Option<u64>,
-    ) {
+    ) -> Result<(), ContractError> {
         sender.require_auth();
 
         let multisig = get_multisig_members(&env);
@@ -112,7 +114,7 @@ impl Multisig {
                 &env,
                 "Multisig: Create transaction proposal: Sender is not a member of this multisig!"
             );
-            panic_with_error!(&env, ContractError::UnauthorizedNotAMember);
+            return Err(ContractError::UnauthorizedNotAMember);
         }
 
         // check if title and description aren't too long
@@ -121,14 +123,14 @@ impl Multisig {
                 &env,
                 "Multisig: Create transaction proposal: Title longer than 64 characters!"
             );
-            panic_with_error!(&env, ContractError::TitleTooLong);
+            return Err(ContractError::TitleTooLong);
         }
         if description.len() > 256 {
             log!(
                 &env,
                 "Multisig: Create transaction proposal: Description longer than 256 characters!"
             );
-            panic_with_error!(&env, ContractError::DescriptionTooLong);
+            return Err(ContractError::DescriptionTooLong);
         }
 
         // loads the previous id, returns it and increments before saving
@@ -149,7 +151,7 @@ impl Multisig {
                 &env,
                 "Multisig: Create Transaction proposal: Expiration date cannot be less than an hour."
             );
-            panic_with_error!(&env, ContractError::InvalidExpirationDate);
+            return Err(ContractError::InvalidExpirationDate);
         }
 
         let proposal = Proposal {
@@ -167,6 +169,8 @@ impl Multisig {
             .publish(("Multisig", "Create proposal Title"), title);
         env.events()
             .publish(("Multisig", "Create proposal Sender"), sender);
+
+        Ok(())
     }
 
     #[allow(dead_code)]
@@ -175,7 +179,7 @@ impl Multisig {
         sender: Address,
         new_wasm_hash: BytesN<32>,
         expiration_date: Option<u64>,
-    ) {
+    ) -> Result<(), ContractError> {
         sender.require_auth();
 
         let multisig = get_multisig_members(&env);
@@ -185,7 +189,7 @@ impl Multisig {
                 &env,
                 "Multisig: Create update proposal: Sender is not a member of this multisig!"
             );
-            panic_with_error!(&env, ContractError::UnauthorizedNotAMember);
+            return Err(ContractError::UnauthorizedNotAMember);
         }
 
         let proposal_id = increment_last_proposal_id(&env);
@@ -215,21 +219,26 @@ impl Multisig {
             .publish(("Multisig", "Create proposal id"), proposal_id);
         env.events()
             .publish(("Multisig", "Create proposal sender"), sender);
+
+        Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn sign_proposal(env: Env, sender: Address, proposal_id: u64) {
+    pub fn sign_proposal(env: Env, sender: Address, proposal_id: u64) -> Result<(), ContractError> {
         sender.require_auth();
 
         let multisig = get_multisig_members(&env);
 
-        let proposal = get_proposal(&env, proposal_id).unwrap_or_else(|| {
-            log!(
-                &env,
-                "Multisig: Sign proposal: Proposal with this ID does not exist!"
-            );
-            panic_with_error!(&env, ContractError::ProposalNotFound);
-        });
+        let proposal = match get_proposal(&env, proposal_id) {
+            Some(proposal) => proposal,
+            None => {
+                log!(
+                    &env,
+                    "Multisig: Sign proposal: Proposal with this ID does not exist!"
+                );
+                return Err(ContractError::ProposalNotFound);
+            }
+        };
 
         // check if sender is a member of this multisig
         if multisig.get(sender.clone()).is_none() {
@@ -237,7 +246,7 @@ impl Multisig {
                 &env,
                 "Multisig: Sign proposal: Sender is not a member of this multisig!"
             );
-            panic_with_error!(&env, ContractError::UnauthorizedNotAMember);
+            return Err(ContractError::UnauthorizedNotAMember);
         }
 
         if proposal.status != ProposalStatus::Open {
@@ -245,7 +254,7 @@ impl Multisig {
                 &env,
                 "Multisig: Sign proposal: Trying to sign a closed proposal!"
             );
-            panic_with_error!(&env, ContractError::ProposalClosed);
+            return Err(ContractError::ProposalClosed);
         }
 
         save_proposal_signature(&env, proposal_id, sender.clone());
@@ -254,19 +263,28 @@ impl Multisig {
             .publish(("Multisig", "Sign proposal ID: "), proposal_id);
         env.events()
             .publish(("Multisig", "Sign proposal sender"), sender);
+
+        Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn execute_proposal(env: Env, sender: Address, proposal_id: u64) {
+    pub fn execute_proposal(
+        env: Env,
+        sender: Address,
+        proposal_id: u64,
+    ) -> Result<(), ContractError> {
         sender.require_auth();
 
-        let mut proposal = get_proposal(&env, proposal_id).unwrap_or_else(|| {
-            log!(
-                &env,
-                "Multisig: Sign proposal: Proposal with this ID does not exist!"
-            );
-            panic_with_error!(&env, ContractError::ProposalNotFound);
-        });
+        let mut proposal = match get_proposal(&env, proposal_id) {
+            Some(proposal) => proposal,
+            None => {
+                log!(
+                    &env,
+                    "Multisig: Sign proposal: Proposal with this ID does not exist!"
+                );
+                return Err(ContractError::ProposalNotFound);
+            }
+        };
 
         let multisig = get_multisig_members(&env);
 
@@ -276,7 +294,7 @@ impl Multisig {
                 &env,
                 "Multisig: Execute proposal: Sender is not a member of this multisig!"
             );
-            panic_with_error!(&env, ContractError::UnauthorizedNotAMember);
+            return Err(ContractError::UnauthorizedNotAMember);
         }
 
         // to prevent a double execution
@@ -285,7 +303,7 @@ impl Multisig {
                 &env,
                 "Multisig: Execute proposal: Trying to execute a closed proposal!"
             );
-            panic_with_error!(&env, ContractError::ProposalClosed);
+            return Err(ContractError::ProposalClosed);
         }
 
         let curr_timestamp = env.ledger().timestamp();
@@ -297,7 +315,7 @@ impl Multisig {
             proposal.status = ProposalStatus::Closed;
             save_proposal(&env, &proposal);
 
-            panic_with_error!(&env, ContractError::ProposalExpired);
+            return Err(ContractError::ProposalExpired);
         }
 
         // collect all addresses that signed this proposal
@@ -320,7 +338,7 @@ impl Multisig {
                 &env,
                 "Multisig: Execute proposal: Required quorum has not been reached!"
             );
-            panic_with_error!(&env, ContractError::QuorumNotReached);
+            return Err(ContractError::QuorumNotReached);
         }
 
         // execute actual proposal
@@ -347,34 +365,40 @@ impl Multisig {
             .publish(("Multisig", "Execute proposal ID: "), proposal_id);
         env.events()
             .publish(("Multisig", "Execute proposal sender"), sender);
+
+        Ok(())
     }
 
     // ----------- QUERY
 
     #[allow(dead_code)]
-    pub fn query_multisig_info(env: Env) -> MultisigInfo {
+    pub fn query_multisig_info(env: Env) -> Result<MultisigInfo, ContractError> {
         let (name, description) = get_name(&env);
-        MultisigInfo {
+        Ok(MultisigInfo {
             name: name.clone(),
             description,
             members: get_multisig_members(&env).keys(),
             quorum_bps: get_quorum_bps(&env),
             version_proposal: get_version(&env),
-        }
+        })
     }
 
     #[allow(dead_code)]
-    pub fn query_multisig_members(env: Env) -> Vec<Address> {
-        get_multisig_members(&env).keys()
+    pub fn query_multisig_members(env: Env) -> Result<Vec<Address>, ContractError> {
+        let multisig_members = get_multisig_members(&env).keys();
+        Ok(multisig_members)
     }
 
     #[allow(dead_code)]
-    pub fn query_proposal(env: Env, proposal_id: u64) -> Option<Proposal> {
-        get_proposal(&env, proposal_id)
+    pub fn query_proposal(env: Env, proposal_id: u64) -> Result<Proposal, ContractError> {
+        get_proposal(&env, proposal_id).ok_or(ContractError::ProposalNotFound)
     }
 
     #[allow(dead_code)]
-    pub fn query_signatures(env: Env, proposal_id: u64) -> Vec<(Address, bool)> {
+    pub fn query_signatures(
+        env: Env,
+        proposal_id: u64,
+    ) -> Result<Vec<(Address, bool)>, ContractError> {
         let multisig = get_multisig_members(&env);
         // collect all addresses that signed this proposal
         let proposal_signatures = get_proposal_signatures(&env, proposal_id);
@@ -388,16 +412,18 @@ impl Multisig {
                 response.push_back((member, false));
             }
         }
-        response
+
+        Ok(response)
     }
 
     #[allow(dead_code)]
-    pub fn query_last_proposal_id(env: Env) -> u64 {
-        get_last_proposal_id(&env)
+    pub fn query_last_proposal_id(env: Env) -> Result<u64, ContractError> {
+        let last_id = get_last_proposal_id(&env);
+        Ok(last_id)
     }
 
     #[allow(dead_code)]
-    pub fn query_all_proposals(env: Env) -> Vec<Proposal> {
+    pub fn query_all_proposals(env: Env) -> Result<Vec<Proposal>, ContractError> {
         let last_proposal_id = get_last_proposal_id(&env);
         let mut proposals: Vec<Proposal> = vec![&env];
 
@@ -409,7 +435,8 @@ impl Multisig {
                 proposals.push_back(current_prosal);
             });
         }
-        proposals
+
+        Ok(proposals)
     }
 }
 
