@@ -44,7 +44,9 @@ fn test_deploy_multisig_from_contract() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(
+    expected = "Multisig Deployer: Initialize: initializing the contract twice is not allowed"
+)]
 fn initialize_twice() {
     let env = Env::default();
     let deployer_client =

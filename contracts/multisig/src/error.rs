@@ -16,4 +16,6 @@ pub enum ContractError {
     ProposalNotFound = 9,
     ProposalExpired = 10,
     InvalidExpirationDate = 11,
+    MembersListEmpty = 12,
+    ZeroAddressProvided = 13,
 }
