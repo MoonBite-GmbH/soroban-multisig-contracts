@@ -69,12 +69,12 @@ pub enum DataKey {
 }
 
 pub fn set_initialized(env: &Env) {
-    env.storage().instance().set(&DataKey::IsInitialized, &());
+    env.storage().persistent().set(&DataKey::IsInitialized, &());
 }
 
 pub fn is_initialized(env: &Env) -> bool {
     env.storage()
-        .instance()
+        .persistent()
         .get::<_, ()>(&DataKey::IsInitialized)
         .is_some()
 }
@@ -83,13 +83,13 @@ pub fn is_initialized(env: &Env) -> bool {
 
 pub fn set_name(env: &Env, name: String, description: String) {
     env.storage()
-        .instance()
+        .persistent()
         .set(&DataKey::NameDescription, &(name, description));
 }
 
 pub fn get_name(env: &Env) -> (String, String) {
     env.storage()
-        .instance()
+        .persistent()
         .get(&DataKey::NameDescription)
         .unwrap()
 }
@@ -97,12 +97,12 @@ pub fn get_name(env: &Env) -> (String, String) {
 // -------------
 
 pub fn get_quorum_bps(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::QuorumBps).unwrap()
+    env.storage().persistent().get(&DataKey::QuorumBps).unwrap()
 }
 
 pub fn save_quorum_bps(env: &Env, quorum_bps: u32) {
     env.storage()
-        .instance()
+        .persistent()
         .set(&DataKey::QuorumBps, &quorum_bps);
 }
 
@@ -110,7 +110,7 @@ pub fn save_quorum_bps(env: &Env, quorum_bps: u32) {
 
 pub fn get_multisig_members(env: &Env) -> Map<Address, ()> {
     env.storage()
-        .instance()
+        .persistent()
         .get(&DataKey::Multisig)
         // This vector is set during initialization
         // if it fails to load, it's a critical error
@@ -122,7 +122,9 @@ pub fn add_multisig_member(env: &Env, member: Address) {
     let mut multisig = get_multisig_members(env);
     multisig.set(member, ());
 
-    env.storage().instance().set(&DataKey::Multisig, &multisig);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Multisig, &multisig);
 }
 
 pub fn save_new_multisig(env: &Env, members: &Vec<Address>) {
@@ -131,7 +133,9 @@ pub fn save_new_multisig(env: &Env, members: &Vec<Address>) {
         multisig.set(member, ());
     }
 
-    env.storage().instance().set(&DataKey::Multisig, &multisig);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Multisig, &multisig);
 }
 
 // -------------
@@ -140,17 +144,19 @@ pub fn save_new_multisig(env: &Env, members: &Vec<Address>) {
 pub fn increment_last_proposal_id(env: &Env) -> u32 {
     let id = env
         .storage()
-        .instance()
+        .persistent()
         .get::<_, u32>(&DataKey::LastProposalId)
         .unwrap_or_default()
         + 1u32;
-    env.storage().instance().set(&DataKey::LastProposalId, &id);
+    env.storage()
+        .persistent()
+        .set(&DataKey::LastProposalId, &id);
     id
 }
 
 pub fn get_last_proposal_id(env: &Env) -> u32 {
     env.storage()
-        .instance()
+        .persistent()
         .get(&DataKey::LastProposalId)
         .unwrap_or_default()
 }
@@ -176,7 +182,7 @@ pub fn save_proposal_signature(e: &Env, proposal_id: u32, signer: Address) {
     let mut proposal_signatures: Map<Address, ()> = get_proposal_signatures(e, proposal_id);
     proposal_signatures.set(signer, ());
 
-    e.storage().instance().set(
+    e.storage().persistent().set(
         &DataKey::ProposalSignatures(proposal_id),
         &proposal_signatures,
     );
@@ -184,7 +190,7 @@ pub fn save_proposal_signature(e: &Env, proposal_id: u32, signer: Address) {
 
 pub fn get_proposal_signatures(env: &Env, proposal_id: u32) -> Map<Address, ()> {
     env.storage()
-        .instance()
+        .persistent()
         .get(&DataKey::ProposalSignatures(proposal_id))
         .unwrap_or(map![&env])
 }
