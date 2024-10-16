@@ -86,12 +86,12 @@ fn propose_transaction_proposal_full_quorum() {
         Proposal {
             id: 1,
             sender: member1.clone(),
+            title: String::from_str(&env, "TxTitle#01"),
+            description: String::from_str(&env, "TxTestDescription"),
             proposal: ProposalType::Transaction(Transaction {
                 token: token.address.clone(),
                 amount: 10_000,
                 recipient: recipient.clone(),
-                title: String::from_str(&env, "TxTitle#01"),
-                description: String::from_str(&env, "TxTestDescription")
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
@@ -1479,12 +1479,12 @@ fn multiple_active_proposals() {
         Proposal {
             id: 1,
             sender: member1.clone(),
+            title: String::from_str(&env, "TxTitle#01"),
+            description: String::from_str(&env, "TxTestDescription"),
             proposal: ProposalType::Transaction(Transaction {
                 token: token.address.clone(),
                 amount: 10_000,
                 recipient: recipient1.clone(),
-                title: String::from_str(&env, "TxTitle#01"),
-                description: String::from_str(&env, "TxTestDescription")
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
@@ -1496,12 +1496,12 @@ fn multiple_active_proposals() {
         Proposal {
             id: 2,
             sender: member3.clone(),
+            title: String::from_str(&env, "TxTitle#02"),
+            description: String::from_str(&env, "TxTestDescription"),
             proposal: ProposalType::Transaction(Transaction {
                 token: token.address.clone(),
                 amount: 15_000,
                 recipient: recipient2.clone(),
-                title: String::from_str(&env, "TxTitle#02"),
-                description: String::from_str(&env, "TxTestDescription")
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
@@ -1513,12 +1513,12 @@ fn multiple_active_proposals() {
         Proposal {
             id: 3,
             sender: member2.clone(),
+            title: String::from_str(&env, "TxTitle#03"),
+            description: String::from_str(&env, "TxTestDescription"),
             proposal: ProposalType::Transaction(Transaction {
                 token: token2.address.clone(),
                 amount: 5_000,
                 recipient: recipient1.clone(),
-                title: String::from_str(&env, "TxTitle#03"),
-                description: String::from_str(&env, "TxTestDescription")
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,
@@ -1730,12 +1730,12 @@ fn create_and_execute_transaction_proposal_within_deadline() {
         Proposal {
             id: 1,
             sender: member1.clone(),
+            title: String::from_str(&env, "TxTitle#01"),
+            description: String::from_str(&env, "TxTestDescription"),
             proposal: ProposalType::Transaction(Transaction {
                 token: token.address.clone(),
                 amount: 10_000,
                 recipient: recipient.clone(),
-                title: String::from_str(&env, "TxTitle#01"),
-                description: String::from_str(&env, "TxTestDescription")
             }),
             status: ProposalStatus::Open,
             creation_timestamp: 0,

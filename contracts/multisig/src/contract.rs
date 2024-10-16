@@ -139,8 +139,6 @@ impl Multisig {
             token,
             amount,
             recipient,
-            title: title.clone(),
-            description,
         };
 
         let creation_timestamp = env.ledger().timestamp();
@@ -161,6 +159,8 @@ impl Multisig {
             status: ProposalStatus::Open,
             creation_timestamp,
             expiration_timestamp,
+            title: title.clone(),
+            description,
         };
 
         save_proposal(&env, &proposal);
@@ -177,6 +177,8 @@ impl Multisig {
     pub fn create_update_proposal(
         env: Env,
         sender: Address,
+        title: String,
+        description: String,
         new_wasm_hash: BytesN<32>,
         expiration_date: Option<u64>,
     ) -> Result<(), ContractError> {
@@ -212,6 +214,8 @@ impl Multisig {
             status: ProposalStatus::Open,
             creation_timestamp,
             expiration_timestamp,
+            title: title.clone(),
+            description,
         };
         save_proposal(&env, &proposal);
 
