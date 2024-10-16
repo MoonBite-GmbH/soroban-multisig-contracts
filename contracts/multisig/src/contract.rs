@@ -51,17 +51,17 @@ impl Multisig {
         save_new_multisig(&env, &members);
 
         // check if title and description aren't too long
-        if name.len() > 64 {
+        if name.len() > 256 {
             log!(
                 &env,
-                "Multisig: Initialize: Name longer than 64 characters!"
+                "Multisig: Initialize: Name longer than 256 characters!"
             );
             return Err(ContractError::TitleTooLong);
         }
-        if description.len() > 256 {
+        if description.len() > 1024 {
             log!(
                 &env,
-                "Multisig: Initialize: Description longer than 256 characters!"
+                "Multisig: Initialize: Description longer than 1024 characters!"
             );
             return Err(ContractError::DescriptionTooLong);
         }
