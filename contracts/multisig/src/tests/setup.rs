@@ -9,7 +9,11 @@ pub const DAY_AS_TIMESTAMP: u64 = 86_400u64;
 pub const TWO_WEEKS_EXPIRATION_DATE: u64 = SEVEN_DAYS_EXPIRATION_DATE * 2;
 
 pub fn deploy_token_contract<'a>(env: &Env, admin: &Address) -> token_contract::Client<'a> {
-    token_contract::Client::new(env, &env.register_stellar_asset_contract(admin.clone()))
+    token_contract::Client::new(
+        env,
+        &env.register_stellar_asset_contract_v2(admin.clone())
+            .address(),
+    )
 }
 
 pub fn initialize_multisig_contract<'a>(

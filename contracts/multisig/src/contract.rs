@@ -51,17 +51,17 @@ impl Multisig {
         save_new_multisig(&env, &members);
 
         // check if title and description aren't too long
-        if name.len() > 64 {
+        if name.len() > 256 {
             log!(
                 &env,
-                "Multisig: Initialize: Name longer than 64 characters!"
+                "Multisig: Initialize: Name longer than 256 characters!"
             );
             return Err(ContractError::TitleTooLong);
         }
-        if description.len() > 256 {
+        if description.len() > 1024 {
             log!(
                 &env,
-                "Multisig: Initialize: Description longer than 256 characters!"
+                "Multisig: Initialize: Description longer than 1024 characters!"
             );
             return Err(ContractError::DescriptionTooLong);
         }
@@ -139,8 +139,6 @@ impl Multisig {
             token,
             amount,
             recipient,
-            title: title.clone(),
-            description,
         };
 
         let creation_timestamp = env.ledger().timestamp();
@@ -161,6 +159,8 @@ impl Multisig {
             status: ProposalStatus::Open,
             creation_timestamp,
             expiration_timestamp,
+            title: title.clone(),
+            description,
         };
 
         save_proposal(&env, &proposal);
@@ -177,6 +177,8 @@ impl Multisig {
     pub fn create_update_proposal(
         env: Env,
         sender: Address,
+        title: String,
+        description: String,
         new_wasm_hash: BytesN<32>,
         expiration_date: Option<u64>,
     ) -> Result<(), ContractError> {
@@ -212,6 +214,8 @@ impl Multisig {
             status: ProposalStatus::Open,
             creation_timestamp,
             expiration_timestamp,
+            title: title.clone(),
+            description,
         };
         save_proposal(&env, &proposal);
 

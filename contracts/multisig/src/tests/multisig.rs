@@ -102,7 +102,7 @@ fn initialize_name_too_long() {
     let multisig = MultisigClient::new(&env, &env.register_contract(None, Multisig {}));
     assert_eq!(
         multisig.try_initialize(
-            &String::from_bytes(&env, &[0u8; 65]),
+            &String::from_bytes(&env, &[0u8; 257]),
             &String::from_str(&env, "Example description of this multisig"),
             &members.clone(),
             &None,
@@ -123,7 +123,7 @@ fn initialize_description_too_long() {
     assert_eq!(
         multisig.try_initialize(
             &String::from_str(&env, "MultisigName"),
-            &String::from_bytes(&env, &[0u8; 257]),
+            &String::from_bytes(&env, &[0u8; 1025]),
             &members.clone(),
             &None,
         ),

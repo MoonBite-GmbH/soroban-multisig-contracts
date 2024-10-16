@@ -11,6 +11,8 @@ pub struct Proposal {
     pub status: ProposalStatus,
     pub creation_timestamp: u64,
     pub expiration_timestamp: u64,
+    pub title: String,
+    pub description: String,
 }
 
 #[contracttype]
@@ -35,8 +37,6 @@ pub struct Transaction {
     pub token: Address,
     pub amount: u64,
     pub recipient: Address,
-    pub title: String,
-    pub description: String,
 }
 
 #[contracttype]
