@@ -12,7 +12,8 @@ use crate::{
         save_proposal_signature, save_quorum_bps, save_version, set_initialized, set_name,
         MultisigInfo, Proposal, ProposalStatus, ProposalType, Transaction,
     },
-    token_contract, ONE_HOUR, SEVEN_DAYS_EXPIRATION_DATE, SOROBAN_ZERO_ADDRESS,
+    token_contract, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD, ONE_HOUR,
+    SEVEN_DAYS_EXPIRATION_DATE, SOROBAN_ZERO_ADDRESS,
 };
 use soroban_decimal::Decimal;
 
@@ -105,6 +106,9 @@ impl Multisig {
         expiration_date: Option<u64>,
     ) -> Result<(), ContractError> {
         sender.require_auth();
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
         let multisig = get_multisig_members(&env);
 
@@ -183,6 +187,9 @@ impl Multisig {
         expiration_date: Option<u64>,
     ) -> Result<(), ContractError> {
         sender.require_auth();
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
         let multisig = get_multisig_members(&env);
 
@@ -230,6 +237,9 @@ impl Multisig {
     #[allow(dead_code)]
     pub fn sign_proposal(env: Env, sender: Address, proposal_id: u64) -> Result<(), ContractError> {
         sender.require_auth();
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
         let multisig = get_multisig_members(&env);
 
@@ -278,6 +288,9 @@ impl Multisig {
         proposal_id: u64,
     ) -> Result<(), ContractError> {
         sender.require_auth();
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
         let mut proposal = match get_proposal(&env, proposal_id) {
             Some(proposal) => proposal,
@@ -377,6 +390,9 @@ impl Multisig {
 
     #[allow(dead_code)]
     pub fn query_multisig_info(env: Env) -> Result<MultisigInfo, ContractError> {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
         let (name, description) = get_name(&env);
         Ok(MultisigInfo {
             name: name.clone(),
@@ -389,12 +405,18 @@ impl Multisig {
 
     #[allow(dead_code)]
     pub fn query_multisig_members(env: Env) -> Result<Vec<Address>, ContractError> {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
         let multisig_members = get_multisig_members(&env).keys();
         Ok(multisig_members)
     }
 
     #[allow(dead_code)]
     pub fn query_proposal(env: Env, proposal_id: u64) -> Result<Proposal, ContractError> {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
         get_proposal(&env, proposal_id).ok_or(ContractError::ProposalNotFound)
     }
 
@@ -403,6 +425,9 @@ impl Multisig {
         env: Env,
         proposal_id: u64,
     ) -> Result<Vec<(Address, bool)>, ContractError> {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
         let multisig = get_multisig_members(&env);
         // collect all addresses that signed this proposal
         let proposal_signatures = get_proposal_signatures(&env, proposal_id);
@@ -422,12 +447,18 @@ impl Multisig {
 
     #[allow(dead_code)]
     pub fn query_last_proposal_id(env: Env) -> Result<u64, ContractError> {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
         let last_id = get_last_proposal_id(&env);
         Ok(last_id)
     }
 
     #[allow(dead_code)]
     pub fn query_all_proposals(env: Env) -> Result<Vec<Proposal>, ContractError> {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
         let last_proposal_id = get_last_proposal_id(&env);
         let mut proposals: Vec<Proposal> = vec![&env];
 
@@ -445,6 +476,9 @@ impl Multisig {
 
     #[allow(dead_code)]
     pub fn is_proposal_ready(env: Env, proposal_id: u64) -> Result<bool, ContractError> {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
         let multisig_len = get_multisig_members(&env).len();
         let signed = get_proposal_signatures(&env, proposal_id).len();
 
