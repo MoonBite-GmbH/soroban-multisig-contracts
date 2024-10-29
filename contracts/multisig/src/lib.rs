@@ -14,8 +14,12 @@ pub mod token_contract {
 }
 // Values used to extend the TTL of storage
 pub const DAY_IN_LEDGERS: u32 = 17280;
-pub const BUMP_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
-pub const LIFETIME_THRESHOLD: u32 = BUMP_AMOUNT - DAY_IN_LEDGERS;
+
+pub const INSTANCE_BUMP_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
+pub const INSTANCE_LIFETIME_THRESHOLD: u32 = INSTANCE_BUMP_AMOUNT - DAY_IN_LEDGERS;
+
+pub const PERSISTENT_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const PERSISTENT_LIFETIME_THRESHOLD: u32 = PERSISTENT_BUMP_AMOUNT - DAY_IN_LEDGERS;
 
 // Values used to track time of proposals lifespan
 pub const ONE_HOUR: u64 = 3_600u64;
