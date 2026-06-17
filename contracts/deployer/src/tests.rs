@@ -5,9 +5,7 @@ use soroban_sdk::{testutils::Address as _, vec, Address, BytesN, Env, String, Sy
 // The contract that will be deployed by the deployer contract.
 #[allow(clippy::too_many_arguments)]
 mod multisig {
-    soroban_sdk::contractimport!(
-        file = "../../target/wasm32-unknown-unknown/release/soroban_multisig.wasm"
-    );
+    soroban_sdk::contractimport!(file = "../../target/wasm32v1-none/release/soroban_multisig.wasm");
 }
 
 #[test]

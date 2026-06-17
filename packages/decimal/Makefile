@@ -2,8 +2,7 @@ default: all
 
 all: lint build test
 
-test: build
-	$(MAKE) -C ../multisig build || break;
+test:
 	cargo test
 
 build:
