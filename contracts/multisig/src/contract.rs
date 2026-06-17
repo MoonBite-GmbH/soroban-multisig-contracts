@@ -227,6 +227,67 @@ impl Multisig {
         Ok(())
     }
 
+    /// Propose to replace the entire multisig membership with `new_members`.
+    /// Once executed (after reaching quorum), the multisig members list is
+    /// overwritten with the provided list. The signers required to pass this
+    /// proposal are the *current* members at execution time.
+    #[allow(dead_code)]
+    pub fn create_member_update_proposal(
+        env: Env,
+        sender: Address,
+        title: String,
+        description: String,
+        new_members: Vec<Address>,
+        expiration_date: Option<u64>,
+    ) -> Result<(), ContractError> {
+        sender.require_auth();
+
+        let multisig = get_multisig_members(&env);
+
+        if multisig.get(sender.clone()).is_none() {
+            log!(
+                &env,
+                "Multisig: Create member update proposal: Sender is not a member of this multisig!"
+            );
+            return Err(ContractError::UnauthorizedNotAMember);
+        }
+
+        // fail fast on an obviously invalid new member list
+        verify_members(&env, &new_members);
+
+        let proposal_id = increment_last_proposal_id(&env);
+        let creation_timestamp = env.ledger().timestamp();
+        let expiration_timestamp = creation_timestamp
+            + expiration_date.unwrap_or(creation_timestamp + SEVEN_DAYS_EXPIRATION_DATE);
+
+        if expiration_timestamp < creation_timestamp + ONE_HOUR {
+            log!(
+                &env,
+                "Multisig: Create member update proposal: Expiration date cannot be less than an hour."
+            );
+            panic_with_error!(&env, ContractError::InvalidExpirationDate);
+        }
+
+        let proposal = Proposal {
+            id: proposal_id,
+            sender: sender.clone(),
+            proposal: ProposalType::UpdateMembers(new_members),
+            status: ProposalStatus::Open,
+            creation_timestamp,
+            expiration_timestamp,
+            title: title.clone(),
+            description,
+        };
+        save_proposal(&env, &proposal);
+
+        env.events()
+            .publish(("Multisig", "Create proposal id"), proposal_id);
+        env.events()
+            .publish(("Multisig", "Create proposal sender"), sender);
+
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub fn sign_proposal(env: Env, sender: Address, proposal_id: u64) -> Result<(), ContractError> {
         sender.require_auth();
@@ -358,6 +419,11 @@ impl Multisig {
             ProposalType::UpdateContract(new_wasm_hash) => {
                 env.deployer().update_current_contract_wasm(new_wasm_hash);
                 increase_version(&env);
+            }
+            ProposalType::UpdateMembers(new_members) => {
+                // re-validate at execution time in case the member set is somehow corrupt
+                verify_members(&env, &new_members);
+                save_new_multisig(&env, &new_members);
             }
         }
 

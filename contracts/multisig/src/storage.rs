@@ -22,6 +22,8 @@ pub enum ProposalType {
     Transaction(Transaction),
     // Update the multisig's wasm bytecode with this wasm hash
     UpdateContract(BytesN<32>),
+    // Replace the entire multisig membership with the provided list
+    UpdateMembers(Vec<Address>),
 }
 
 #[contracttype]

@@ -18,7 +18,7 @@ mod utils {
     #[allow(clippy::too_many_arguments)]
     mod multisig {
         soroban_sdk::contractimport!(
-            file = "../../target/wasm32-unknown-unknown/release/soroban_multisig.wasm"
+            file = "../../target/wasm32v1-none/release/soroban_multisig.wasm"
         );
     }
 
