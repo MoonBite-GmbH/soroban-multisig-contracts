@@ -1,45 +1,92 @@
-on: [pull_request]
-
 name: Basic
 
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# Cancel in-flight runs for the same ref when a new commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # soroban-sdk 26.x requires rust >= 1.91 AND the wasm32v1-none target
+  # (wasm32-unknown-unknown is rejected on rust >= 1.82 by the sdk build script).
+  RUST_VERSION: "1.95.0"
+  WASM_TARGET: "wasm32v1-none"
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
 jobs:
+  fmt:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+
+      - name: cargo fmt --all --check
+        run: cargo fmt --all --check
+
   test:
     name: Test Suite
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust-version: [1.78.0]
+    needs: fmt
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: ${{ matrix.rust-version }}
-          target: wasm32-unknown-unknown
-          override: true
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ env.WASM_TARGET }}
+
+      - name: Cache cargo registry + build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          # The contractimport! macros in the multisig crate consume the wasm
+          # built by sibling crates, so we must keep the release artifacts
+          # warm across runs.
+          cache-targets: true
+          cache-on-failure: true
+
+      - name: Build release wasm
+        run: make build
+
       - name: Run unit tests
-        run: make test
+        run: cargo test --workspace --locked
 
-  lints:
-    name: Lints
+  clippy:
+    name: Clippy
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust-version: [1.78.0]
+    needs: fmt
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: ${{ matrix.rust-version }}
-          override: true
-          target: wasm32-unknown-unknown
-          components: rustfmt, clippy
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ env.WASM_TARGET }}
+          components: clippy
 
-      - name: Run cargo clippy
-        run: make lints
+      - name: Cache cargo registry + build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: true
+          cache-on-failure: true
 
+      - name: Build release wasm (required for contractimport!)
+        run: make build
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
